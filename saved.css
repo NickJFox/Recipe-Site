@@ -1,0 +1,92 @@
+/* Main styles */
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #D9AC59;
+  }
+  
+  button {
+    background-color: #3D4025;
+    color: #F2E9CE;
+    border: none;
+    padding: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  button:hover {
+    background-color: rgba(61, 64, 37, 0.5);
+    color: #F2E9CE;
+    border: none;
+    padding: 5px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  #savedback-button {
+    margin: 15px;
+    padding: 15px;
+    position: absolute;
+    top: 0px;
+  }
+  
+  
+  #savedrecipe-list {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  h2 {
+    font-size: 24px;
+  }
+  
+  #savedrecipes {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: start;
+  }
+  
+  .recipe-item {
+    flex: 0 0 300px;
+    margin: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background-color: #f9f9f9;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .recipe-item:hover {
+    background-color: #ebebeb;
+  }
+  
+  .recipe-item img {
+    width: 100%;
+    height: auto;
+  }
+  
+  
+  
+  #details {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  
+  h3 {
+    font-size: 20px;
+  }
+  
+  h4 {
+    font-size: 16px;
+    margin-top: 20px;
+  }
+  
+  ul,
+  ol {
+    margin: 10px 0;
+    padding-left: 20px;
+    list-style-type: none; /* Remove bullet points */
+  }
