@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Recipe Keeper",
+    "slug": "recipe-keeper",
+    "sdkVersion": "54.0.0",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#f4ede0"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {},
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}
