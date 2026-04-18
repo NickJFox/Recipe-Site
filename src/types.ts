@@ -23,16 +23,25 @@ export type Ingredient = {
   notes: string;
 };
 
+export type RecipeSection = {
+  id: string;
+  title: string;
+  ingredients: Ingredient[];
+  instructions: string[];
+};
+
 export type Recipe = {
   id: string;
   title: string;
   description: string;
-  category: RecipeCategory;
+  categories: RecipeCategory[];
   tags: string[];
+  imageUri?: string;
   sourceType: RecipeSourceType;
   sourceUrl?: string;
   sourceLabel?: string;
   ingredients: Ingredient[];
+  subRecipes: RecipeSection[];
   instructions: string[];
   servings: string;
   prepTime: string;

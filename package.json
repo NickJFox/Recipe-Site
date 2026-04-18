@@ -4,15 +4,17 @@
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
-    "start": "node ./node_modules/expo/bin/cli start",
-    "android": "node ./node_modules/expo/bin/cli start --android",
-    "ios": "node ./node_modules/expo/bin/cli start --ios",
+    "start": "node ./node_modules/expo/bin/cli start --tunnel",
+    "start:lan": "node ./node_modules/expo/bin/cli start --lan",
+    "android": "node ./node_modules/expo/bin/cli start --tunnel --android",
+    "ios": "node ./node_modules/expo/bin/cli start --tunnel --ios",
     "web": "node ./node_modules/expo/bin/cli start --web",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^2.1.2",
     "expo": "^54.0.0",
+    "expo-image-picker": "~17.0.10",
     "expo-status-bar": "~3.0.9",
     "react": "19.1.0",
     "react-native": "0.81.0"

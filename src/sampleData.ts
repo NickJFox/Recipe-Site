@@ -7,8 +7,9 @@ export const sampleData: AppData = {
       id: createId("recipe"),
       title: "Lemon Garlic Pasta",
       description: "A fast weeknight pasta with lemon, garlic, and parmesan.",
-      category: "Dinner",
+      categories: ["Lunch", "Dinner"],
       tags: ["quick", "vegetarian"],
+      imageUri: "https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=1200&q=80",
       sourceType: "manual",
       sourceUrl: "",
       sourceLabel: "",
@@ -18,6 +19,21 @@ export const sampleData: AppData = {
         { id: createId("ingredient"), name: "garlic", quantity: "4", unit: "cloves", notes: "minced" },
         { id: createId("ingredient"), name: "lemon", quantity: "1", unit: "", notes: "zest and juice" },
         { id: createId("ingredient"), name: "parmesan", quantity: "0.5", unit: "cup", notes: "grated" },
+      ],
+      subRecipes: [
+        {
+          id: createId("subrecipe"),
+          title: "Garlic Breadcrumb Topping",
+          ingredients: [
+            { id: createId("ingredient"), name: "panko", quantity: "0.75", unit: "cup", notes: "" },
+            { id: createId("ingredient"), name: "olive oil", quantity: "1", unit: "tbsp", notes: "" },
+            { id: createId("ingredient"), name: "garlic", quantity: "1", unit: "clove", notes: "finely chopped" },
+          ],
+          instructions: [
+            "Toast the panko in olive oil until golden.",
+            "Stir in the garlic for the last minute, then spoon over the pasta.",
+          ],
+        },
       ],
       instructions: [
         "Cook the pasta in salted water until al dente.",
@@ -33,8 +49,9 @@ export const sampleData: AppData = {
       id: createId("recipe"),
       title: "Overnight Berry Oats",
       description: "Meal-prep breakfast with berries, chia, and yogurt.",
-      category: "Breakfast",
+      categories: ["Breakfast", "Meal Prep"],
       tags: ["meal prep", "high protein"],
+      imageUri: "https://images.unsplash.com/photo-1517673400267-0251440c45dc?auto=format&fit=crop&w=1200&q=80",
       sourceType: "website",
       sourceUrl: "https://example.com/overnight-berry-oats",
       sourceLabel: "example.com",
@@ -45,6 +62,7 @@ export const sampleData: AppData = {
         { id: createId("ingredient"), name: "greek yogurt", quantity: "0.5", unit: "cup", notes: "" },
         { id: createId("ingredient"), name: "berries", quantity: "1", unit: "cup", notes: "" },
       ],
+      subRecipes: [],
       instructions: [
         "Mix oats, milk, chia seeds, and yogurt in a jar.",
         "Refrigerate overnight.",

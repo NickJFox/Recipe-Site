@@ -1,4 +1,4 @@
-import { ImportDraft, Ingredient, Recipe, RecipeSourceType } from "./types";
+import { ImportDraft, Ingredient, Recipe, RecipeSection, RecipeSourceType } from "./types";
 
 export function createId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -55,17 +55,28 @@ export function createEmptyIngredient(): Ingredient {
   };
 }
 
+export function createEmptyRecipeSection(title = ""): RecipeSection {
+  return {
+    id: createId("subrecipe"),
+    title,
+    ingredients: [createEmptyIngredient()],
+    instructions: [""],
+  };
+}
+
 export function createEmptyRecipe(sourceType: RecipeSourceType = "manual"): Recipe {
   return {
     id: createId("recipe"),
     title: "",
     description: "",
-    category: "Dinner",
+    categories: ["Dinner"],
     tags: [],
+    imageUri: "",
     sourceType,
     sourceUrl: "",
     sourceLabel: "",
     ingredients: [createEmptyIngredient()],
+    subRecipes: [],
     instructions: [""],
     servings: "",
     prepTime: "",
@@ -89,6 +100,8 @@ export function cleanRecipe(recipe: Recipe): Recipe {
     ...recipe,
     title: recipe.title.trim(),
     description: recipe.description.trim(),
+    categories: recipe.categories.filter(Boolean),
+    imageUri: recipe.imageUri?.trim() ?? "",
     sourceUrl: recipe.sourceUrl?.trim() ?? "",
     sourceLabel: recipe.sourceLabel?.trim() ?? "",
     servings: recipe.servings.trim(),
@@ -103,6 +116,25 @@ export function cleanRecipe(recipe: Recipe): Recipe {
         notes: ingredient.notes.trim(),
       }))
       .filter((ingredient) => ingredient.name.length > 0),
+    subRecipes: recipe.subRecipes
+      .map((section) => ({
+        ...section,
+        title: section.title.trim(),
+        ingredients: section.ingredients
+          .map((ingredient) => ({
+            ...ingredient,
+            name: ingredient.name.trim(),
+            quantity: ingredient.quantity.trim(),
+            unit: ingredient.unit.trim(),
+            notes: ingredient.notes.trim(),
+          }))
+          .filter((ingredient) => ingredient.name.length > 0),
+        instructions: section.instructions.map((step) => step.trim()).filter(Boolean),
+      }))
+      .filter(
+        (section) =>
+          section.title.length > 0 || section.ingredients.length > 0 || section.instructions.length > 0
+      ),
     instructions: recipe.instructions.map((step) => step.trim()).filter(Boolean),
   };
 }
@@ -111,33 +143,52 @@ export function mergeGroceryItems(recipes: Recipe[]) {
   const map = new Map<string, { label: string; quantity: string; recipes: string[] }>();
 
   recipes.forEach((recipe) => {
-    recipe.ingredients.forEach((ingredient) => {
-      const key = `${ingredient.name.toLowerCase()}::${ingredient.unit.toLowerCase()}`;
-      const current = map.get(key);
-      const quantityText = ingredient.quantity || "some";
-      const nextLabel = ingredient.unit
-        ? `${quantityText} ${ingredient.unit} ${ingredient.name}`.trim()
-        : `${quantityText} ${ingredient.name}`.trim();
-
-      if (!current) {
-        map.set(key, {
-          label: nextLabel,
-          quantity: ingredient.quantity,
-          recipes: [recipe.title],
-        });
-        return;
-      }
-
-      const mergedQuantity = mergeQuantities(current.quantity, ingredient.quantity);
-      current.quantity = mergedQuantity;
-      current.label = ingredient.unit
-        ? `${mergedQuantity || "some"} ${ingredient.unit} ${ingredient.name}`.trim()
-        : `${mergedQuantity || "some"} ${ingredient.name}`.trim();
-      current.recipes = [...new Set([...current.recipes, recipe.title])];
+    addIngredientsToMap(map, recipe.ingredients, recipe.title);
+    recipe.subRecipes.forEach((section) => {
+      const label = section.title ? `${recipe.title}: ${section.title}` : recipe.title;
+      addIngredientsToMap(map, section.ingredients, label);
     });
   });
 
   return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+export function getRecipeIngredientCount(recipe: Recipe) {
+  return (
+    recipe.ingredients.length +
+    recipe.subRecipes.reduce((count, section) => count + section.ingredients.length, 0)
+  );
+}
+
+function addIngredientsToMap(
+  map: Map<string, { label: string; quantity: string; recipes: string[] }>,
+  ingredients: Ingredient[],
+  recipeTitle: string
+) {
+  ingredients.forEach((ingredient) => {
+    const key = `${ingredient.name.toLowerCase()}::${ingredient.unit.toLowerCase()}`;
+    const current = map.get(key);
+    const quantityText = ingredient.quantity || "some";
+    const nextLabel = ingredient.unit
+      ? `${quantityText} ${ingredient.unit} ${ingredient.name}`.trim()
+      : `${quantityText} ${ingredient.name}`.trim();
+
+    if (!current) {
+      map.set(key, {
+        label: nextLabel,
+        quantity: ingredient.quantity,
+        recipes: [recipeTitle],
+      });
+      return;
+    }
+
+    const mergedQuantity = mergeQuantities(current.quantity, ingredient.quantity);
+    current.quantity = mergedQuantity;
+    current.label = ingredient.unit
+      ? `${mergedQuantity || "some"} ${ingredient.unit} ${ingredient.name}`.trim()
+      : `${mergedQuantity || "some"} ${ingredient.name}`.trim();
+    current.recipes = [...new Set([...current.recipes, recipeTitle])];
+  });
 }
 
 function mergeQuantities(first: string, second: string) {

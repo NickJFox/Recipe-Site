@@ -30,6 +30,14 @@ npm install
 npm start
 ```
 
+`npm start` uses Expo tunnel mode so a physical phone can connect even when local LAN discovery is blocked by Wi-Fi isolation, firewall rules, or router settings.
+
+If you want the faster local-network path instead, run:
+
+```bash
+npm run start:lan
+```
+
 3. Open the app in:
 
 - iOS Simulator

@@ -13,6 +13,15 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Recipe Keeper to access your photo library so you can attach recipe images.",
+          "cameraPermission": "Allow Recipe Keeper to use your camera so you can take recipe photos."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

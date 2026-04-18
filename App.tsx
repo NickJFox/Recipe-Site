@@ -1,6 +1,8 @@
 import { StatusBar } from "expo-status-bar";
+import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Image,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -10,17 +12,27 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { CATEGORY_OPTIONS, SOURCE_LABELS } from "./src/constants";
+import {
+  CATEGORY_OPTIONS,
+  PREP_TIME_OPTIONS,
+  QUANTITY_OPTIONS,
+  SERVING_OPTIONS,
+  SOURCE_LABELS,
+  TAG_OPTIONS,
+  UNIT_OPTIONS,
+} from "./src/constants";
 import { sampleData } from "./src/sampleData";
 import { loadAppData, saveAppData } from "./src/storage";
-import { AppData, ImportDraft, Ingredient, Recipe, RecipeCategory } from "./src/types";
+import { AppData, ImportDraft, Ingredient, Recipe, RecipeCategory, RecipeSection } from "./src/types";
 import {
   buildRecipeFromImport,
   cleanRecipe,
   createEmptyIngredient,
   createEmptyRecipe,
+  createEmptyRecipeSection,
   createId,
   detectSourceType,
+  getRecipeIngredientCount,
   guessTitleFromUrl,
   mergeGroceryItems,
 } from "./src/utils";
@@ -39,8 +51,46 @@ const TABS: Array<{ key: "home" | "recipe-form" | "imports" | "grocery"; label: 
   { key: "grocery", label: "Groceries" },
 ];
 
+function normalizeRecipe(recipe: Recipe): Recipe {
+  const legacyCategory = (recipe as Recipe & { category?: RecipeCategory }).category;
+
+  return {
+    ...recipe,
+    categories:
+      recipe.categories?.length
+        ? recipe.categories
+        : legacyCategory
+          ? [legacyCategory]
+          : ["Dinner"],
+    imageUri: recipe.imageUri ?? "",
+    ingredients: recipe.ingredients?.length ? recipe.ingredients : [createEmptyIngredient()],
+    subRecipes: (recipe.subRecipes ?? []).map((section) => ({
+      ...section,
+      ingredients: section.ingredients?.length ? section.ingredients : [createEmptyIngredient()],
+      instructions: section.instructions?.length ? section.instructions : [""],
+    })),
+    instructions: recipe.instructions?.length ? recipe.instructions : [""],
+  };
+}
+
+function hasRecipeContent(recipe: Recipe) {
+  const subRecipes = recipe.subRecipes ?? [];
+  const ingredientCount = recipe.ingredients.length + subRecipes.reduce((sum, section) => sum + section.ingredients.length, 0);
+  const instructionCount = recipe.instructions.length + subRecipes.reduce((sum, section) => sum + section.instructions.length, 0);
+  return ingredientCount > 0 && instructionCount > 0;
+}
+
+function formatIngredientLine(ingredient: Ingredient) {
+  return `${ingredient.quantity ? `${ingredient.quantity} ` : ""}${ingredient.unit ? `${ingredient.unit} ` : ""}${
+    ingredient.name
+  }${ingredient.notes ? ` (${ingredient.notes})` : ""}`.trim();
+}
+
 export default function App() {
-  const [data, setData] = useState<AppData>(sampleData);
+  const [data, setData] = useState<AppData>({
+    recipes: sampleData.recipes.map(normalizeRecipe),
+    importDrafts: sampleData.importDrafts,
+  });
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<RecipeCategory | "All">("All");
@@ -52,7 +102,10 @@ export default function App() {
     async function bootstrap() {
       const stored = await loadAppData();
       if (stored) {
-        setData(stored);
+        setData({
+          recipes: stored.recipes.map((recipe) => normalizeRecipe(recipe as Recipe)),
+          importDrafts: stored.importDrafts,
+        });
       }
       setLoading(false);
     }
@@ -70,7 +123,7 @@ export default function App() {
 
   const filteredRecipes = useMemo(() => {
     return data.recipes.filter((recipe) =>
-      selectedCategory === "All" ? true : recipe.category === selectedCategory
+      selectedCategory === "All" ? true : recipe.categories.includes(selectedCategory)
     );
   }, [data.recipes, selectedCategory]);
 
@@ -99,7 +152,7 @@ export default function App() {
 
   function handleSaveRecipe(recipe: Recipe, importDraftId?: string) {
     const cleaned = cleanRecipe(recipe);
-    if (!cleaned.title || cleaned.ingredients.length === 0 || cleaned.instructions.length === 0) {
+    if (!cleaned.title || !hasRecipeContent(cleaned)) {
       return;
     }
 
@@ -248,15 +301,17 @@ export default function App() {
                     onPress={() => setScreen({ name: "recipe-detail", recipeId: recipe.id })}
                   >
                     <View style={styles.recipeCardHeader}>
-                      <Text style={styles.recipeCategory}>{recipe.category}</Text>
+                      <Text style={styles.recipeCategory}>{recipe.categories.join(" • ")}</Text>
                       <Pressable onPress={() => toggleFavorite(recipe.id)}>
                         <Text style={styles.favoriteText}>{recipe.favorite ? "Saved" : "Save"}</Text>
                       </Pressable>
                     </View>
+                    {recipe.imageUri ? <Image source={{ uri: recipe.imageUri }} style={styles.recipeCardImage} /> : null}
                     <Text style={styles.recipeTitle}>{recipe.title}</Text>
                     <Text style={styles.recipeDescription}>{recipe.description || "No description yet."}</Text>
                     <View style={styles.metaRow}>
-                      <MetaPill label={`${recipe.ingredients.length} ingredients`} />
+                      <MetaPill label={`${getRecipeIngredientCount(recipe)} ingredients`} />
+                      {recipe.subRecipes.length > 0 ? <MetaPill label={`${recipe.subRecipes.length} sub-recipes`} /> : null}
                       <MetaPill label={SOURCE_LABELS[recipe.sourceType]} />
                     </View>
                   </Pressable>
@@ -268,7 +323,7 @@ export default function App() {
           {screen.name === "recipe-form" && (
             <RecipeForm
               key={screen.draft.id}
-              draft={screen.draft}
+              draft={normalizeRecipe(screen.draft)}
               importDraftId={screen.importDraftId}
               onCancel={() => setScreen({ name: "home" })}
               onSave={handleSaveRecipe}
@@ -330,7 +385,7 @@ export default function App() {
                         onPress={() =>
                           setScreen({
                             name: "recipe-form",
-                            draft: buildRecipeFromImport(draft),
+                            draft: normalizeRecipe(buildRecipeFromImport(draft)),
                             importDraftId: draft.id,
                           })
                         }
@@ -363,7 +418,7 @@ export default function App() {
                       onPress={() => toggleRecipeSelection(recipe.id)}
                     >
                       <Text style={styles.selectionTitle}>{recipe.title}</Text>
-                      <Text style={styles.selectionDetail}>{recipe.category}</Text>
+                      <Text style={styles.selectionDetail}>{recipe.categories.join(" • ")}</Text>
                     </Pressable>
                     <Switch
                       value={selectedRecipeIds.includes(recipe.id)}
@@ -443,6 +498,233 @@ function MetaPill({ label }: { label: string }) {
   );
 }
 
+function SelectField({
+  label,
+  value,
+  placeholder,
+  options,
+  expanded,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: readonly string[];
+  expanded: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable style={styles.selectTrigger} onPress={onToggle}>
+        <Text style={[styles.selectTriggerText, !value && styles.placeholderText]}>
+          {value || placeholder}
+        </Text>
+      </Pressable>
+      {expanded ? (
+        <ScrollView style={styles.dropdownMenu} nestedScrollEnabled>
+          {options.map((option) => (
+            <Pressable
+              key={`${label}-${option || "empty"}`}
+              style={[styles.dropdownOption, value === option && styles.dropdownOptionActive]}
+              onPress={() => onSelect(option)}
+            >
+              <Text style={[styles.dropdownOptionText, value === option && styles.dropdownOptionTextActive]}>
+                {option || "No unit"}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+function NumberScrollField({
+  label,
+  value,
+  placeholder,
+  options,
+  expanded,
+  onToggle,
+  onSelect,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  options: readonly string[];
+  expanded: boolean;
+  onToggle: () => void;
+  onSelect: (value: string) => void;
+}) {
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable style={styles.selectTrigger} onPress={onToggle}>
+        <Text style={[styles.selectTriggerText, !value && styles.placeholderText]}>
+          {value || placeholder}
+        </Text>
+      </Pressable>
+      {expanded ? (
+        <ScrollView style={styles.dropdownMenu} nestedScrollEnabled>
+          {options.map((option) => (
+            <Pressable
+              key={`${label}-${option}`}
+              style={[styles.dropdownOption, value === option && styles.dropdownOptionActive]}
+              onPress={() => onSelect(option)}
+            >
+              <Text style={[styles.dropdownOptionText, value === option && styles.dropdownOptionTextActive]}>
+                {option}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+
+function MultiSelectField({
+  label,
+  values,
+  options,
+  expanded,
+  onToggle,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  options: readonly string[];
+  expanded: boolean;
+  onToggle: () => void;
+  onChange: (values: string[]) => void;
+}) {
+  const summary = values.length > 0 ? values.join(", ") : "Select tags";
+
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <Pressable style={styles.selectTrigger} onPress={onToggle}>
+        <Text style={[styles.selectTriggerText, values.length === 0 && styles.placeholderText]}>
+          {summary}
+        </Text>
+      </Pressable>
+      {expanded ? (
+        <View style={styles.selectMenu}>
+          {options.map((option) => {
+            const active = values.includes(option);
+            return (
+              <FilterChip
+                key={`${label}-${option}`}
+                label={option}
+                active={active}
+                onPress={() =>
+                  onChange(active ? values.filter((value) => value !== option) : [...values, option])
+                }
+              />
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function IngredientEditor({
+  ingredient,
+  quantityExpanded,
+  onToggleQuantity,
+  unitExpanded,
+  onToggleUnit,
+  onUpdate,
+  onRemove,
+}: {
+  ingredient: Ingredient;
+  quantityExpanded: boolean;
+  onToggleQuantity: () => void;
+  unitExpanded: boolean;
+  onToggleUnit: () => void;
+  onUpdate: (key: keyof Ingredient, value: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={styles.ingredientCard}>
+      <View style={styles.ingredientRow}>
+        <View style={styles.quantityFieldWrap}>
+          <NumberScrollField
+            label="Qty"
+            value={ingredient.quantity}
+            placeholder="Choose"
+            options={QUANTITY_OPTIONS}
+            expanded={quantityExpanded}
+            onToggle={onToggleQuantity}
+            onSelect={(value) => onUpdate("quantity", value)}
+          />
+        </View>
+        <View style={styles.unitSelectWrap}>
+          <SelectField
+            label="Unit"
+            value={ingredient.unit}
+            placeholder="Unit"
+            options={UNIT_OPTIONS}
+            expanded={unitExpanded}
+            onToggle={onToggleUnit}
+            onSelect={(value) => onUpdate("unit", value)}
+          />
+        </View>
+      </View>
+      <TextInput
+        value={ingredient.name}
+        onChangeText={(value) => onUpdate("name", value)}
+        placeholder="Ingredient name"
+        placeholderTextColor="#8a7d6f"
+        style={styles.input}
+      />
+      <TextInput
+        value={ingredient.notes}
+        onChangeText={(value) => onUpdate("notes", value)}
+        placeholder="Notes"
+        placeholderTextColor="#8a7d6f"
+        style={styles.input}
+      />
+      <Pressable style={styles.ghostButton} onPress={onRemove}>
+        <Text style={styles.ghostButtonLabel}>Remove ingredient</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function InstructionEditor({
+  label,
+  value,
+  onChange,
+  onRemove,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <View style={styles.instructionCard}>
+      <Text style={styles.stepNumber}>{label}</Text>
+      <TextInput
+        value={value}
+        onChangeText={onChange}
+        placeholder="Write the cooking step"
+        placeholderTextColor="#8a7d6f"
+        multiline
+        style={[styles.input, styles.textArea]}
+      />
+      <Pressable style={styles.ghostButton} onPress={onRemove}>
+        <Text style={styles.ghostButtonLabel}>Remove step</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 type RecipeFormProps = {
   draft: Recipe;
   importDraftId?: string;
@@ -451,12 +733,9 @@ type RecipeFormProps = {
 };
 
 function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps) {
-  const [recipe, setRecipe] = useState<Recipe>({
-    ...draft,
-    ingredients: draft.ingredients.length > 0 ? draft.ingredients : [createEmptyIngredient()],
-    instructions: draft.instructions.length > 0 ? draft.instructions : [""],
-  });
-  const [tagInput, setTagInput] = useState(recipe.tags.join(", "));
+  const [recipe, setRecipe] = useState<Recipe>(normalizeRecipe(draft));
+  const [expandedField, setExpandedField] = useState<string | null>(null);
+  const [imageError, setImageError] = useState("");
 
   function updateIngredient(id: string, key: keyof Ingredient, value: string) {
     setRecipe((current) => ({
@@ -465,6 +744,9 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
         ingredient.id === id ? { ...ingredient, [key]: value } : ingredient
       ),
     }));
+    if (key === "unit" || key === "quantity") {
+      setExpandedField(null);
+    }
   }
 
   function addIngredient() {
@@ -508,10 +790,146 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
     }));
   }
 
+  function updateSubRecipe(sectionId: string, updater: (section: RecipeSection) => RecipeSection) {
+    setRecipe((current) => ({
+      ...current,
+      subRecipes: current.subRecipes.map((section) => (section.id === sectionId ? updater(section) : section)),
+    }));
+  }
+
+  function addSubRecipe() {
+    setRecipe((current) => ({
+      ...current,
+      subRecipes: [...current.subRecipes, createEmptyRecipeSection(`Part ${current.subRecipes.length + 1}`)],
+    }));
+  }
+
+  function removeSubRecipe(sectionId: string) {
+    setRecipe((current) => ({
+      ...current,
+      subRecipes: current.subRecipes.filter((section) => section.id !== sectionId),
+    }));
+  }
+
+  function updateSubRecipeIngredient(sectionId: string, ingredientId: string, key: keyof Ingredient, value: string) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      ingredients: section.ingredients.map((ingredient) =>
+        ingredient.id === ingredientId ? { ...ingredient, [key]: value } : ingredient
+      ),
+    }));
+    if (key === "unit" || key === "quantity") {
+      setExpandedField(null);
+    }
+  }
+
+  function addSubRecipeIngredient(sectionId: string) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      ingredients: [...section.ingredients, createEmptyIngredient()],
+    }));
+  }
+
+  function removeSubRecipeIngredient(sectionId: string, ingredientId: string) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      ingredients:
+        section.ingredients.length === 1
+          ? [createEmptyIngredient()]
+          : section.ingredients.filter((ingredient) => ingredient.id !== ingredientId),
+    }));
+  }
+
+  function updateSubRecipeInstruction(sectionId: string, index: number, value: string) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      instructions: section.instructions.map((step, stepIndex) => (stepIndex === index ? value : step)),
+    }));
+  }
+
+  function addSubRecipeInstruction(sectionId: string) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      instructions: [...section.instructions, ""],
+    }));
+  }
+
+  function removeSubRecipeInstruction(sectionId: string, index: number) {
+    updateSubRecipe(sectionId, (section) => ({
+      ...section,
+      instructions:
+        section.instructions.length === 1
+          ? [""]
+          : section.instructions.filter((_, stepIndex) => stepIndex !== index),
+    }));
+  }
+
+  async function pickRecipeImage(mode: "camera" | "library") {
+    setImageError("");
+
+    if (mode === "camera") {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setImageError("Camera permission is required to take a photo.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]?.uri) {
+        setRecipe((current) => ({ ...current, imageUri: result.assets[0].uri }));
+      }
+      return;
+    }
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setImageError("Photo library permission is required to import an image.");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]?.uri) {
+      setRecipe((current) => ({ ...current, imageUri: result.assets[0].uri }));
+    }
+  }
+
   return (
     <View style={styles.screenBlock}>
       <SectionHeading title="Recipe Editor" detail="Create or finish a recipe for your library" />
       <View style={styles.heroCard}>
+        {recipe.imageUri ? <Image source={{ uri: recipe.imageUri }} style={styles.editorImagePreview} /> : null}
+        <Text style={styles.fieldLabel}>Recipe image</Text>
+        <View style={styles.inlineButtonRow}>
+          <Pressable style={styles.secondaryButton} onPress={() => void pickRecipeImage("camera")}>
+            <Text style={styles.secondaryButtonLabel}>Take photo</Text>
+          </Pressable>
+          <Pressable style={styles.secondaryButton} onPress={() => void pickRecipeImage("library")}>
+            <Text style={styles.secondaryButtonLabel}>Choose from library</Text>
+          </Pressable>
+          {recipe.imageUri ? (
+            <Pressable
+              style={styles.ghostButton}
+              onPress={() => {
+                setRecipe((current) => ({ ...current, imageUri: "" }));
+                setImageError("");
+              }}
+            >
+              <Text style={styles.ghostButtonLabel}>Remove photo</Text>
+            </Pressable>
+          ) : null}
+        </View>
+        {imageError ? <Text style={styles.errorText}>{imageError}</Text> : null}
         <TextInput
           value={recipe.title}
           onChangeText={(value) => setRecipe((current) => ({ ...current, title: value }))}
@@ -528,47 +946,58 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
           style={[styles.input, styles.textArea]}
         />
 
-        <Text style={styles.fieldLabel}>Category</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-          {CATEGORY_OPTIONS.map((category) => (
-            <FilterChip
-              key={category}
-              label={category}
-              active={recipe.category === category}
-              onPress={() => setRecipe((current) => ({ ...current, category }))}
-            />
-          ))}
-        </ScrollView>
-
-        <View style={styles.twoColumnRow}>
-          <TextInput
-            value={recipe.prepTime}
-            onChangeText={(value) => setRecipe((current) => ({ ...current, prepTime: value }))}
-            placeholder="Prep time"
-            placeholderTextColor="#8a7d6f"
-            style={[styles.input, styles.halfInput]}
-          />
-          <TextInput
-            value={recipe.servings}
-            onChangeText={(value) => setRecipe((current) => ({ ...current, servings: value }))}
-            placeholder="Servings"
-            placeholderTextColor="#8a7d6f"
-            style={[styles.input, styles.halfInput]}
-          />
-        </View>
-
-        <TextInput
-          value={tagInput}
-          onChangeText={(value) => {
-            setTagInput(value);
+        <MultiSelectField
+          label="Categories"
+          values={recipe.categories}
+          options={CATEGORY_OPTIONS}
+          expanded={expandedField === "categories"}
+          onToggle={() => setExpandedField((current) => (current === "categories" ? null : "categories"))}
+          onChange={(values) =>
             setRecipe((current) => ({
               ...current,
-              tags: value.split(",").map((tag) => tag.trim()).filter(Boolean),
-            }));
-          }}
-          placeholder="Tags separated by commas"
-          placeholderTextColor="#8a7d6f"
-          style={styles.input}
+              categories: values.length > 0 ? (values as RecipeCategory[]) : ["Dinner"],
+            }))
+          }
+        />
+
+        <View style={styles.twoColumnRow}>
+          <View style={styles.halfInput}>
+            <SelectField
+              label="Prep time"
+              value={recipe.prepTime}
+              placeholder="Choose prep time"
+              options={PREP_TIME_OPTIONS}
+              expanded={expandedField === "prep-time"}
+              onToggle={() => setExpandedField((current) => (current === "prep-time" ? null : "prep-time"))}
+              onSelect={(value) => {
+                setRecipe((current) => ({ ...current, prepTime: value }));
+                setExpandedField(null);
+              }}
+            />
+          </View>
+          <View style={styles.halfInput}>
+            <NumberScrollField
+              label="Servings"
+              value={recipe.servings}
+              placeholder="Choose servings"
+              options={SERVING_OPTIONS}
+              expanded={expandedField === "servings"}
+              onToggle={() => setExpandedField((current) => (current === "servings" ? null : "servings"))}
+              onSelect={(value) => {
+                setRecipe((current) => ({ ...current, servings: value }));
+                setExpandedField(null);
+              }}
+            />
+          </View>
+        </View>
+
+        <MultiSelectField
+          label="Tags"
+          values={recipe.tags}
+          options={TAG_OPTIONS}
+          expanded={expandedField === "tags"}
+          onToggle={() => setExpandedField((current) => (current === "tags" ? null : "tags"))}
+          onChange={(values) => setRecipe((current) => ({ ...current, tags: values }))}
         />
 
         <TextInput
@@ -586,84 +1015,114 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
           style={styles.input}
         />
 
-        <Text style={styles.fieldLabel}>Ingredients</Text>
+        <Text style={styles.fieldLabel}>Main recipe ingredients</Text>
         {recipe.ingredients.map((ingredient) => (
-          <View key={ingredient.id} style={styles.ingredientCard}>
-            <View style={styles.twoColumnRow}>
-              <TextInput
-                value={ingredient.quantity}
-                onChangeText={(value) => updateIngredient(ingredient.id, "quantity", value)}
-                placeholder="Qty"
-                placeholderTextColor="#8a7d6f"
-                style={[styles.input, styles.thirdInput]}
-              />
-              <TextInput
-                value={ingredient.unit}
-                onChangeText={(value) => updateIngredient(ingredient.id, "unit", value)}
-                placeholder="Unit"
-                placeholderTextColor="#8a7d6f"
-                style={[styles.input, styles.thirdInput]}
-              />
-              <TextInput
-                value={ingredient.name}
-                onChangeText={(value) => updateIngredient(ingredient.id, "name", value)}
-                placeholder="Ingredient name"
-                placeholderTextColor="#8a7d6f"
-                style={[styles.input, styles.growInput]}
-              />
-            </View>
-            <TextInput
-              value={ingredient.notes}
-              onChangeText={(value) => updateIngredient(ingredient.id, "notes", value)}
-              placeholder="Notes"
-              placeholderTextColor="#8a7d6f"
-              style={styles.input}
-            />
-            <Pressable style={styles.ghostButton} onPress={() => removeIngredient(ingredient.id)}>
-              <Text style={styles.ghostButtonLabel}>Remove ingredient</Text>
-            </Pressable>
-          </View>
+          <IngredientEditor
+            key={ingredient.id}
+            ingredient={ingredient}
+            quantityExpanded={expandedField === `ingredient-quantity-${ingredient.id}`}
+            onToggleQuantity={() =>
+              setExpandedField((current) =>
+                current === `ingredient-quantity-${ingredient.id}` ? null : `ingredient-quantity-${ingredient.id}`
+              )
+            }
+            unitExpanded={expandedField === `ingredient-${ingredient.id}`}
+            onToggleUnit={() =>
+              setExpandedField((current) => (current === `ingredient-${ingredient.id}` ? null : `ingredient-${ingredient.id}`))
+            }
+            onUpdate={(key, value) => updateIngredient(ingredient.id, key, value)}
+            onRemove={() => removeIngredient(ingredient.id)}
+          />
         ))}
-
         <Pressable style={styles.secondaryButton} onPress={addIngredient}>
           <Text style={styles.secondaryButtonLabel}>Add ingredient</Text>
         </Pressable>
 
-        <Text style={styles.fieldLabel}>Instructions</Text>
+        <Text style={styles.fieldLabel}>Main recipe instructions</Text>
         {recipe.instructions.map((step, index) => (
-          <View key={`${recipe.id}-step-${index}`} style={styles.instructionCard}>
-            <Text style={styles.stepNumber}>Step {index + 1}</Text>
-            <TextInput
-              value={step}
-              onChangeText={(value) => updateInstruction(index, value)}
-              placeholder="Write the cooking step"
-              placeholderTextColor="#8a7d6f"
-              multiline
-              style={[styles.input, styles.textArea]}
-            />
-            <Pressable style={styles.ghostButton} onPress={() => removeInstruction(index)}>
-              <Text style={styles.ghostButtonLabel}>Remove step</Text>
-            </Pressable>
-          </View>
+          <InstructionEditor
+            key={`${recipe.id}-step-${index}`}
+            label={`Step ${index + 1}`}
+            value={step}
+            onChange={(value) => updateInstruction(index, value)}
+            onRemove={() => removeInstruction(index)}
+          />
         ))}
-
         <Pressable style={styles.secondaryButton} onPress={addInstruction}>
           <Text style={styles.secondaryButtonLabel}>Add instruction</Text>
         </Pressable>
 
+        <Text style={styles.fieldLabel}>Sub-recipes</Text>
+        {recipe.subRecipes.length === 0 ? (
+          <Text style={styles.supportingText}>
+            Add a nested recipe for things like meatballs, sauce, dressing, topping, or filling.
+          </Text>
+        ) : null}
+        {recipe.subRecipes.map((section) => (
+          <View key={section.id} style={styles.subRecipeCard}>
+            <TextInput
+              value={section.title}
+              onChangeText={(value) =>
+                updateSubRecipe(section.id, (current) => ({
+                  ...current,
+                  title: value,
+                }))
+              }
+              placeholder="Sub-recipe title"
+              placeholderTextColor="#8a7d6f"
+              style={styles.input}
+            />
+            <Text style={styles.fieldLabel}>Ingredients</Text>
+            {section.ingredients.map((ingredient) => (
+              <IngredientEditor
+                key={ingredient.id}
+                ingredient={ingredient}
+                quantityExpanded={expandedField === `sub-quantity-${section.id}-${ingredient.id}`}
+                onToggleQuantity={() =>
+                  setExpandedField((current) =>
+                    current === `sub-quantity-${section.id}-${ingredient.id}`
+                      ? null
+                      : `sub-quantity-${section.id}-${ingredient.id}`
+                  )
+                }
+                unitExpanded={expandedField === `sub-${section.id}-${ingredient.id}`}
+                onToggleUnit={() =>
+                  setExpandedField((current) =>
+                    current === `sub-${section.id}-${ingredient.id}` ? null : `sub-${section.id}-${ingredient.id}`
+                  )
+                }
+                onUpdate={(key, value) => updateSubRecipeIngredient(section.id, ingredient.id, key, value)}
+                onRemove={() => removeSubRecipeIngredient(section.id, ingredient.id)}
+              />
+            ))}
+            <Pressable style={styles.secondaryButton} onPress={() => addSubRecipeIngredient(section.id)}>
+              <Text style={styles.secondaryButtonLabel}>Add sub-recipe ingredient</Text>
+            </Pressable>
+
+            <Text style={styles.fieldLabel}>Instructions</Text>
+            {section.instructions.map((step, index) => (
+              <InstructionEditor
+                key={`${section.id}-step-${index}`}
+                label={`Step ${index + 1}`}
+                value={step}
+                onChange={(value) => updateSubRecipeInstruction(section.id, index, value)}
+                onRemove={() => removeSubRecipeInstruction(section.id, index)}
+              />
+            ))}
+            <Pressable style={styles.secondaryButton} onPress={() => addSubRecipeInstruction(section.id)}>
+              <Text style={styles.secondaryButtonLabel}>Add sub-recipe step</Text>
+            </Pressable>
+            <Pressable style={styles.ghostButton} onPress={() => removeSubRecipe(section.id)}>
+              <Text style={styles.ghostButtonLabel}>Remove sub-recipe</Text>
+            </Pressable>
+          </View>
+        ))}
+        <Pressable style={styles.secondaryButton} onPress={addSubRecipe}>
+          <Text style={styles.secondaryButtonLabel}>Add sub-recipe</Text>
+        </Pressable>
+
         <View style={styles.inlineButtonRow}>
-          <Pressable
-            style={styles.primaryButton}
-            onPress={() =>
-              onSave(
-                {
-                  ...recipe,
-                  tags: tagInput.split(",").map((tag) => tag.trim()).filter(Boolean),
-                },
-                importDraftId
-              )
-            }
-          >
+          <Pressable style={styles.primaryButton} onPress={() => onSave(recipe, importDraftId)}>
             <Text style={styles.primaryButtonLabel}>Save recipe</Text>
           </Pressable>
           <Pressable style={styles.ghostButton} onPress={onCancel}>
@@ -688,8 +1147,12 @@ function RecipeDetail({
 }) {
   return (
     <View style={styles.screenBlock}>
-      <SectionHeading title={recipe.title} detail={`${recipe.category} • ${SOURCE_LABELS[recipe.sourceType]}`} />
+      <SectionHeading
+        title={recipe.title}
+        detail={`${recipe.categories.join(" • ")} • ${SOURCE_LABELS[recipe.sourceType]}`}
+      />
       <View style={styles.heroCard}>
+        {recipe.imageUri ? <Image source={{ uri: recipe.imageUri }} style={styles.detailImage} /> : null}
         <Text style={styles.supportingText}>{recipe.description || "No description added."}</Text>
         <View style={styles.metaRow}>
           {recipe.prepTime ? <MetaPill label={recipe.prepTime} /> : null}
@@ -699,21 +1162,37 @@ function RecipeDetail({
           ))}
         </View>
 
-        <Text style={styles.detailHeading}>Ingredients</Text>
+        <Text style={styles.detailHeading}>Main ingredients</Text>
         {recipe.ingredients.map((ingredient) => (
           <Text key={ingredient.id} style={styles.detailLine}>
-            {ingredient.quantity ? `${ingredient.quantity} ` : ""}
-            {ingredient.unit ? `${ingredient.unit} ` : ""}
-            {ingredient.name}
-            {ingredient.notes ? ` (${ingredient.notes})` : ""}
+            {formatIngredientLine(ingredient)}
           </Text>
         ))}
 
-        <Text style={styles.detailHeading}>Instructions</Text>
+        <Text style={styles.detailHeading}>Main instructions</Text>
         {recipe.instructions.map((step, index) => (
           <Text key={`${recipe.id}-instruction-${index}`} style={styles.detailLine}>
             {index + 1}. {step}
           </Text>
+        ))}
+
+        {recipe.subRecipes.length > 0 ? <Text style={styles.detailHeading}>Sub-recipes</Text> : null}
+        {recipe.subRecipes.map((section) => (
+          <View key={section.id} style={styles.detailSectionCard}>
+            <Text style={styles.subRecipeTitle}>{section.title || "Untitled sub-recipe"}</Text>
+            <Text style={styles.subRecipeHeading}>Ingredients</Text>
+            {section.ingredients.map((ingredient) => (
+              <Text key={ingredient.id} style={styles.detailLine}>
+                {formatIngredientLine(ingredient)}
+              </Text>
+            ))}
+            <Text style={styles.subRecipeHeading}>Instructions</Text>
+            {section.instructions.map((step, index) => (
+              <Text key={`${section.id}-instruction-${index}`} style={styles.detailLine}>
+                {index + 1}. {step}
+              </Text>
+            ))}
+          </View>
         ))}
 
         {recipe.sourceUrl ? (
@@ -816,6 +1295,7 @@ const styles = StyleSheet.create({
     color: "#1f2f25",
     fontSize: 24,
     fontWeight: "800",
+    flexShrink: 1,
   },
   sectionDetail: {
     color: "#766858",
@@ -839,6 +1319,11 @@ const styles = StyleSheet.create({
     color: "#655d54",
     fontSize: 14,
     lineHeight: 21,
+  },
+  errorText: {
+    color: "#7a2f1e",
+    fontSize: 14,
+    lineHeight: 20,
   },
   chipScroll: {
     marginHorizontal: -2,
@@ -875,6 +1360,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+  },
+  recipeCardImage: {
+    width: "100%",
+    height: 168,
+    borderRadius: 18,
+    backgroundColor: "#eadbc7",
   },
   recipeCategory: {
     color: "#8d4a28",
@@ -936,16 +1427,63 @@ const styles = StyleSheet.create({
   twoColumnRow: {
     flexDirection: "row",
     gap: 10,
-    alignItems: "center",
+    alignItems: "flex-start",
   },
   halfInput: {
     flex: 1,
   },
-  thirdInput: {
-    width: 76,
+  quantityInput: {
+    width: 84,
   },
-  growInput: {
-    flex: 1,
+  quantityFieldWrap: {
+    width: 104,
+  },
+  selectField: {
+    gap: 8,
+  },
+  selectTrigger: {
+    backgroundColor: "#f8f0e5",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  selectTriggerText: {
+    color: "#1f2f25",
+    fontSize: 15,
+  },
+  placeholderText: {
+    color: "#8a7d6f",
+  },
+  dropdownMenu: {
+    maxHeight: 220,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    backgroundColor: "#fffdf8",
+  },
+  dropdownOption: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eadbc7",
+  },
+  dropdownOptionActive: {
+    backgroundColor: "#eadbc7",
+  },
+  dropdownOptionText: {
+    color: "#5a4636",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  dropdownOptionTextActive: {
+    color: "#1f2f25",
+  },
+  selectMenu: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   ingredientCard: {
     backgroundColor: "#fdf6ed",
@@ -954,6 +1492,14 @@ const styles = StyleSheet.create({
     gap: 10,
     borderWidth: 1,
     borderColor: "#eadbc7",
+  },
+  ingredientRow: {
+    flexDirection: "row",
+    gap: 10,
+    alignItems: "flex-start",
+  },
+  unitSelectWrap: {
+    flex: 1,
   },
   instructionCard: {
     backgroundColor: "#fdf6ed",
@@ -966,6 +1512,14 @@ const styles = StyleSheet.create({
   stepNumber: {
     color: "#8d4a28",
     fontWeight: "700",
+  },
+  subRecipeCard: {
+    backgroundColor: "#fff4e6",
+    borderRadius: 20,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#e3c8a7",
+    gap: 12,
   },
   primaryButton: {
     backgroundColor: "#1f2f25",
@@ -1057,6 +1611,18 @@ const styles = StyleSheet.create({
     color: "#766858",
     fontSize: 13,
   },
+  editorImagePreview: {
+    width: "100%",
+    height: 220,
+    borderRadius: 22,
+    backgroundColor: "#eadbc7",
+  },
+  detailImage: {
+    width: "100%",
+    height: 240,
+    borderRadius: 22,
+    backgroundColor: "#eadbc7",
+  },
   detailHeading: {
     color: "#1f2f25",
     fontWeight: "800",
@@ -1067,5 +1633,23 @@ const styles = StyleSheet.create({
     color: "#4e473f",
     fontSize: 15,
     lineHeight: 23,
+  },
+  detailSectionCard: {
+    backgroundColor: "#fdf6ed",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#eadbc7",
+    gap: 6,
+  },
+  subRecipeTitle: {
+    color: "#1f2f25",
+    fontWeight: "800",
+    fontSize: 17,
+  },
+  subRecipeHeading: {
+    color: "#8d4a28",
+    fontWeight: "700",
+    marginTop: 6,
   },
 });
