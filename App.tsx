@@ -2,6 +2,7 @@ import { StatusBar } from "expo-status-bar";
 import * as ImagePicker from "expo-image-picker";
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Alert,
   Image,
   Pressable,
   SafeAreaView,
@@ -15,10 +16,8 @@ import {
 import {
   CATEGORY_OPTIONS,
   PREP_TIME_OPTIONS,
-  QUANTITY_OPTIONS,
   SERVING_OPTIONS,
   SOURCE_LABELS,
-  TAG_OPTIONS,
   UNIT_OPTIONS,
 } from "./src/constants";
 import { sampleData } from "./src/sampleData";
@@ -632,6 +631,81 @@ function MultiSelectField({
   );
 }
 
+function TagsInputField({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: string[];
+  onChange: (values: string[]) => void;
+}) {
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        value={values.join(", ")}
+        onChangeText={(value) =>
+          onChange(
+            value
+              .split(",")
+              .map((tag) => tag.trim())
+              .filter(Boolean)
+          )
+        }
+        placeholder="Add tags separated by commas"
+        placeholderTextColor="#8a7d6f"
+        style={styles.input}
+      />
+    </View>
+  );
+}
+
+function QuantityField({
+  label,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) {
+  function getNextValue(direction: "decrease" | "increase") {
+    const numericValue = Number.parseFloat(value);
+    if (!Number.isFinite(numericValue)) {
+      return direction === "increase" ? "1" : "";
+    }
+
+    const step = numericValue >= 1 ? 1 : 0.25;
+    const nextValue = direction === "increase" ? numericValue + step : Math.max(0, numericValue - step);
+    return nextValue === 0 ? "" : Number(nextValue.toFixed(2)).toString();
+  }
+
+  return (
+    <View style={styles.selectField}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.quantityControl}>
+        <Pressable style={styles.quantityAdjustButton} onPress={() => onChange(getNextValue("decrease"))}>
+          <Text style={styles.quantityAdjustButtonLabel}>-</Text>
+        </Pressable>
+        <TextInput
+          value={value}
+          onChangeText={onChange}
+          placeholder={placeholder}
+          placeholderTextColor="#8a7d6f"
+          keyboardType="decimal-pad"
+          style={styles.quantityEditorInput}
+        />
+        <Pressable style={styles.quantityAdjustButton} onPress={() => onChange(getNextValue("increase"))}>
+          <Text style={styles.quantityAdjustButtonLabel}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 function IngredientEditor({
   ingredient,
   quantityExpanded,
@@ -653,14 +727,11 @@ function IngredientEditor({
     <View style={styles.ingredientCard}>
       <View style={styles.ingredientRow}>
         <View style={styles.quantityFieldWrap}>
-          <NumberScrollField
+          <QuantityField
             label="Qty"
             value={ingredient.quantity}
-            placeholder="Choose"
-            options={QUANTITY_OPTIONS}
-            expanded={quantityExpanded}
-            onToggle={onToggleQuantity}
-            onSelect={(value) => onUpdate("quantity", value)}
+            placeholder="1"
+            onChange={(value) => onUpdate("quantity", value)}
           />
         </View>
         <View style={styles.unitSelectWrap}>
@@ -736,6 +807,14 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
   const [recipe, setRecipe] = useState<Recipe>(normalizeRecipe(draft));
   const [expandedField, setExpandedField] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
+
+  function openImagePickerMenu() {
+    Alert.alert("Add recipe image", "Choose how you want to add the photo.", [
+      { text: "Take photo", onPress: () => void pickRecipeImage("camera") },
+      { text: "Choose from library", onPress: () => void pickRecipeImage("library") },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  }
 
   function updateIngredient(id: string, key: keyof Ingredient, value: string) {
     setRecipe((current) => ({
@@ -867,14 +946,34 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
   async function pickRecipeImage(mode: "camera" | "library") {
     setImageError("");
 
-    if (mode === "camera") {
-      const permission = await ImagePicker.requestCameraPermissionsAsync();
-      if (!permission.granted) {
-        setImageError("Camera permission is required to take a photo.");
+    try {
+      if (mode === "camera") {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          setImageError("Camera permission is required to take a photo.");
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets[0]?.uri) {
+          setRecipe((current) => ({ ...current, imageUri: result.assets[0].uri }));
+        }
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setImageError("Photo library permission is required to import an image.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -883,24 +982,10 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
       if (!result.canceled && result.assets[0]?.uri) {
         setRecipe((current) => ({ ...current, imageUri: result.assets[0].uri }));
       }
-      return;
-    }
-
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      setImageError("Photo library permission is required to import an image.");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]?.uri) {
-      setRecipe((current) => ({ ...current, imageUri: result.assets[0].uri }));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown image picker error.";
+      setImageError("Could not open the image picker.");
+      Alert.alert("Image Picker Error", message);
     }
   }
 
@@ -911,12 +996,6 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
         {recipe.imageUri ? <Image source={{ uri: recipe.imageUri }} style={styles.editorImagePreview} /> : null}
         <Text style={styles.fieldLabel}>Recipe image</Text>
         <View style={styles.inlineButtonRow}>
-          <Pressable style={styles.secondaryButton} onPress={() => void pickRecipeImage("camera")}>
-            <Text style={styles.secondaryButtonLabel}>Take photo</Text>
-          </Pressable>
-          <Pressable style={styles.secondaryButton} onPress={() => void pickRecipeImage("library")}>
-            <Text style={styles.secondaryButtonLabel}>Choose from library</Text>
-          </Pressable>
           {recipe.imageUri ? (
             <Pressable
               style={styles.ghostButton}
@@ -925,9 +1004,13 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
                 setImageError("");
               }}
             >
-              <Text style={styles.ghostButtonLabel}>Remove photo</Text>
+              <Text style={styles.ghostButtonLabel}>Remove Image</Text>
             </Pressable>
-          ) : null}
+          ) : (
+            <Pressable style={styles.secondaryButton} onPress={openImagePickerMenu}>
+              <Text style={styles.secondaryButtonLabel}>Add Image</Text>
+            </Pressable>
+          )}
         </View>
         {imageError ? <Text style={styles.errorText}>{imageError}</Text> : null}
         <TextInput
@@ -991,12 +1074,9 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
           </View>
         </View>
 
-        <MultiSelectField
+        <TagsInputField
           label="Tags"
           values={recipe.tags}
-          options={TAG_OPTIONS}
-          expanded={expandedField === "tags"}
-          onToggle={() => setExpandedField((current) => (current === "tags" ? null : "tags"))}
           onChange={(values) => setRecipe((current) => ({ ...current, tags: values }))}
         />
 
@@ -1436,10 +1516,43 @@ const styles = StyleSheet.create({
     width: 84,
   },
   quantityFieldWrap: {
-    width: 104,
+    width: 152,
   },
   selectField: {
     gap: 8,
+  },
+  quantityControl: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  quantityAdjustButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: "#eadbc7",
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quantityAdjustButtonLabel: {
+    color: "#1f2f25",
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  quantityEditorInput: {
+    flex: 1,
+    backgroundColor: "#f8f0e5",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    color: "#1f2f25",
+    fontSize: 15,
+    textAlign: "center",
   },
   selectTrigger: {
     backgroundColor: "#f8f0e5",
