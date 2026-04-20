@@ -45,8 +45,7 @@ type Screen =
 
 const TABS: Array<{ key: "home" | "recipe-form" | "imports" | "grocery"; label: string }> = [
   { key: "home", label: "Recipes" },
-  { key: "recipe-form", label: "Add Recipe" },
-  { key: "imports", label: "Import" },
+  { key: "imports", label: "Meal Plan" },
   { key: "grocery", label: "Groceries" },
 ];
 
@@ -272,7 +271,7 @@ export default function App() {
               <SectionHeading
                 title="Recipe Library"
                 detail={`${data.recipes.length} saved recipes`}
-                actionLabel="Manual entry"
+                actionLabel="Add Recipe"
                 onAction={openNewRecipeForm}
               />
 
