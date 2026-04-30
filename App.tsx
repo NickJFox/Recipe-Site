@@ -231,11 +231,10 @@ export default function App() {
       <StatusBar style="dark" />
       <View style={styles.appShell}>
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>Recipe Keeper</Text>
-          <Text style={styles.title}>Your kitchen, organized for mobile.</Text>
+          <Text style={styles.eyebrow}>Recipe Book</Text>
+          <Text style={styles.title}>Recipes you love - Building meal plans and grocery lists.</Text>
           <Text style={styles.subtitle}>
-            Save recipes by category, manually capture dishes, queue link or social imports, and
-            build one grocery list from multiple meals.
+            Save recipes by category, build meal plans, and create grocery list from multiple meals.
           </Text>
         </View>
 
@@ -300,9 +299,6 @@ export default function App() {
                   >
                     <View style={styles.recipeCardHeader}>
                       <Text style={styles.recipeCategory}>{recipe.categories.join(" • ")}</Text>
-                      <Pressable onPress={() => toggleFavorite(recipe.id)}>
-                        <Text style={styles.favoriteText}>{recipe.favorite ? "Saved" : "Save"}</Text>
-                      </Pressable>
                     </View>
                     {recipe.imageUri ? <Image source={{ uri: recipe.imageUri }} style={styles.recipeCardImage} /> : null}
                     <Text style={styles.recipeTitle}>{recipe.title}</Text>
