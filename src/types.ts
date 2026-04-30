@@ -72,8 +72,12 @@ export type MealPlanEntry = {
   recipeId: string | null;
 };
 
+export type GroceryEssential = Ingredient;
+
 export type AppData = {
   recipes: Recipe[];
   importDrafts: ImportDraft[];
   mealPlan: MealPlanEntry[];
+  groceryEssentials: GroceryEssential[];
+  checkedGroceryItemKeys: string[];
 };

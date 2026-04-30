@@ -1,5 +1,12 @@
 import { ImportDraft, Ingredient, Recipe, RecipeSection, RecipeSourceType } from "./types";
 
+export type GroceryListItem = {
+  key: string;
+  label: string;
+  quantity: string;
+  recipes: string[];
+};
+
 export function createId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -49,7 +56,7 @@ export function createEmptyIngredient(): Ingredient {
   return {
     id: createId("ingredient"),
     name: "",
-    quantity: "",
+    quantity: "1",
     unit: "",
     notes: "",
   };
@@ -140,7 +147,7 @@ export function cleanRecipe(recipe: Recipe): Recipe {
 }
 
 export function mergeGroceryItems(recipes: Recipe[]) {
-  const map = new Map<string, { label: string; quantity: string; recipes: string[] }>();
+  const map = new Map<string, GroceryListItem>();
 
   recipes.forEach((recipe) => {
     addIngredientsToMap(map, recipe.ingredients, recipe.title);
@@ -148,6 +155,16 @@ export function mergeGroceryItems(recipes: Recipe[]) {
       const label = section.title ? `${recipe.title}: ${section.title}` : recipe.title;
       addIngredientsToMap(map, section.ingredients, label);
     });
+  });
+
+  return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+export function mergeIngredientCollections(collections: Array<{ label: string; ingredients: Ingredient[] }>) {
+  const map = new Map<string, GroceryListItem>();
+
+  collections.forEach((collection) => {
+    addIngredientsToMap(map, collection.ingredients, collection.label);
   });
 
   return Array.from(map.values()).sort((a, b) => a.label.localeCompare(b.label));
@@ -161,7 +178,7 @@ export function getRecipeIngredientCount(recipe: Recipe) {
 }
 
 function addIngredientsToMap(
-  map: Map<string, { label: string; quantity: string; recipes: string[] }>,
+  map: Map<string, GroceryListItem>,
   ingredients: Ingredient[],
   recipeTitle: string
 ) {
@@ -175,6 +192,7 @@ function addIngredientsToMap(
 
     if (!current) {
       map.set(key, {
+        key,
         label: nextLabel,
         quantity: ingredient.quantity,
         recipes: [recipeTitle],

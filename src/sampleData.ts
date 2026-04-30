@@ -84,4 +84,10 @@ export const sampleData: AppData = {
     { day: "Saturday", recipeId: null },
     { day: "Sunday", recipeId: null },
   ],
+  groceryEssentials: [
+    { id: createId("ingredient"), name: "eggs", quantity: "1", unit: "dozen", notes: "" },
+    { id: createId("ingredient"), name: "milk", quantity: "1", unit: "carton", notes: "" },
+    { id: createId("ingredient"), name: "bananas", quantity: "1", unit: "bunch", notes: "" },
+  ],
+  checkedGroceryItemKeys: [],
 };

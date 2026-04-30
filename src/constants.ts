@@ -78,7 +78,9 @@ export const UNIT_OPTIONS = [
   "can",
   "jar",
   "package",
+  "carton",
   "slice",
   "bunch",
+  "dozen",
   "pinch",
 ] as const;

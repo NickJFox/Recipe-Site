@@ -30,7 +30,7 @@ import {
   createEmptyRecipeSection,
   detectSourceType,
   getRecipeIngredientCount,
-  mergeGroceryItems,
+  mergeIngredientCollections,
 } from "./src/utils";
 
 type Screen =
@@ -62,6 +62,14 @@ function createEmptyMealPlan() {
 
 function normalizeAppData(appData: AppData | { recipes: Recipe[]; importDrafts: ImportDraft[] }) {
   const mealPlanSource = "mealPlan" in appData && Array.isArray(appData.mealPlan) ? appData.mealPlan : [];
+  const groceryEssentials =
+    "groceryEssentials" in appData && Array.isArray(appData.groceryEssentials)
+      ? appData.groceryEssentials
+      : [];
+  const checkedGroceryItemKeys =
+    "checkedGroceryItemKeys" in appData && Array.isArray(appData.checkedGroceryItemKeys)
+      ? appData.checkedGroceryItemKeys
+      : [];
 
   return {
     recipes: appData.recipes.map(normalizeRecipe),
@@ -70,6 +78,15 @@ function normalizeAppData(appData: AppData | { recipes: Recipe[]; importDrafts: 
       day,
       recipeId: mealPlanSource.find((entry) => entry.day === day)?.recipeId ?? null,
     })),
+    groceryEssentials: groceryEssentials.map((ingredient) => ({
+      ...ingredient,
+      id: ingredient.id ?? createEmptyIngredient().id,
+      name: ingredient.name ?? "",
+      quantity: ingredient.quantity ?? "",
+      unit: ingredient.unit ?? "",
+      notes: ingredient.notes ?? "",
+    })),
+    checkedGroceryItemKeys: checkedGroceryItemKeys.filter((key): key is string => typeof key === "string"),
   } satisfies AppData;
 }
 
@@ -115,6 +132,12 @@ export default function App() {
   const [selectedCategory, setSelectedCategory] = useState<RecipeCategory | "All">("All");
   const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
   const [expandedMealPlanDay, setExpandedMealPlanDay] = useState<MealPlanDay | null>(null);
+  const [includeMealPlanGroceries, setIncludeMealPlanGroceries] = useState(true);
+  const [includeManualRecipeGroceries, setIncludeManualRecipeGroceries] = useState(false);
+  const [includeEssentialGroceries, setIncludeEssentialGroceries] = useState(true);
+  const [manageEssentials, setManageEssentials] = useState(false);
+  const [groceryDraft, setGroceryDraft] = useState<Ingredient>(createEmptyIngredient());
+  const [expandedGroceryUnit, setExpandedGroceryUnit] = useState(false);
 
   useEffect(() => {
     async function bootstrap() {
@@ -142,10 +165,59 @@ export default function App() {
     );
   }, [data.recipes, selectedCategory]);
 
+  const plannedRecipesForGroceries = useMemo(
+    () =>
+      data.mealPlan
+        .map((entry) => ({
+          day: entry.day,
+          recipe: data.recipes.find((recipe) => recipe.id === entry.recipeId) ?? null,
+        }))
+        .filter((entry): entry is { day: MealPlanDay; recipe: Recipe } => Boolean(entry.recipe)),
+    [data.mealPlan, data.recipes]
+  );
+
   const groceryItems = useMemo(() => {
-    const recipes = data.recipes.filter((recipe) => selectedRecipeIds.includes(recipe.id));
-    return mergeGroceryItems(recipes);
-  }, [data.recipes, selectedRecipeIds]);
+    const collections: Array<{ label: string; ingredients: Ingredient[] }> = [];
+
+    if (includeMealPlanGroceries) {
+      plannedRecipesForGroceries.forEach(({ day, recipe }) => {
+        collections.push({ label: `${day}: ${recipe.title}`, ingredients: recipe.ingredients });
+        recipe.subRecipes.forEach((section) => {
+          collections.push({
+            label: section.title ? `${day}: ${recipe.title} - ${section.title}` : `${day}: ${recipe.title}`,
+            ingredients: section.ingredients,
+          });
+        });
+      });
+    }
+
+    if (includeManualRecipeGroceries) {
+      const manualRecipes = data.recipes.filter((recipe) => selectedRecipeIds.includes(recipe.id));
+      manualRecipes.forEach((recipe) => {
+        collections.push({ label: recipe.title, ingredients: recipe.ingredients });
+        recipe.subRecipes.forEach((section) => {
+          collections.push({
+            label: section.title ? `${recipe.title} - ${section.title}` : recipe.title,
+            ingredients: section.ingredients,
+          });
+        });
+      });
+    }
+
+    if (includeEssentialGroceries) {
+      collections.push({ label: "Essentials", ingredients: data.groceryEssentials });
+    }
+
+    return mergeIngredientCollections(collections);
+  }, [
+    data.groceryEssentials,
+    data.recipes,
+    includeEssentialGroceries,
+    includeManualRecipeGroceries,
+    includeMealPlanGroceries,
+    plannedRecipesForGroceries,
+    selectedRecipeIds,
+  ]);
 
   function openNewRecipeForm() {
     setScreen({ name: "recipe-form", draft: createEmptyRecipe("manual") });
@@ -212,6 +284,51 @@ export default function App() {
     setSelectedRecipeIds((current) =>
       current.includes(recipeId) ? current.filter((id) => id !== recipeId) : [...current, recipeId]
     );
+  }
+
+  function addGroceryEssential() {
+    if (!groceryDraft.name.trim()) {
+      return;
+    }
+
+    setData((current) => ({
+      ...current,
+      groceryEssentials: [
+        ...current.groceryEssentials,
+        {
+          ...groceryDraft,
+          name: groceryDraft.name.trim(),
+          quantity: groceryDraft.quantity.trim(),
+          unit: groceryDraft.unit.trim(),
+          notes: groceryDraft.notes.trim(),
+        },
+      ],
+    }));
+    setGroceryDraft(createEmptyIngredient());
+    setExpandedGroceryUnit(false);
+  }
+
+  function removeGroceryEssential(ingredientId: string) {
+    setData((current) => ({
+      ...current,
+      groceryEssentials: current.groceryEssentials.filter((ingredient) => ingredient.id !== ingredientId),
+    }));
+  }
+
+  function toggleCheckedGroceryItem(itemKey: string) {
+    setData((current) => ({
+      ...current,
+      checkedGroceryItemKeys: current.checkedGroceryItemKeys.includes(itemKey)
+        ? current.checkedGroceryItemKeys.filter((key) => key !== itemKey)
+        : [...current.checkedGroceryItemKeys, itemKey],
+    }));
+  }
+
+  function clearCheckedGroceries() {
+    setData((current) => ({
+      ...current,
+      checkedGroceryItemKeys: [],
+    }));
   }
 
   function assignMealPlanRecipe(day: MealPlanDay, recipeId: string | null) {
@@ -472,41 +589,203 @@ export default function App() {
 
           {screen.name === "grocery" && (
             <View style={styles.screenBlock}>
-              <SectionHeading title="Grocery List" detail="Combine ingredients from saved recipes" />
+              <SectionHeading title="Grocery List" detail="Build one list from meal plans, recipes, and essentials" />
               <View style={styles.heroCard}>
-                <Text style={styles.cardTitle}>Choose recipes</Text>
+                <Text style={styles.cardTitle}>List sources</Text>
                 <Text style={styles.supportingText}>
-                  Select the recipes you want to cook, and the app will merge ingredient lines into
-                  one shopping list.
+                  Turn on the sources you want to include in this shopping run.
                 </Text>
-                {data.recipes.map((recipe) => (
-                  <View key={recipe.id} style={styles.selectionRow}>
-                    <Pressable
-                      style={styles.selectionContent}
-                      onPress={() => toggleRecipeSelection(recipe.id)}
-                    >
-                      <Text style={styles.selectionTitle}>{recipe.title}</Text>
-                      <Text style={styles.selectionDetail}>{recipe.categories.join(" • ")}</Text>
-                    </Pressable>
-                    <Switch
-                      value={selectedRecipeIds.includes(recipe.id)}
-                      onValueChange={() => toggleRecipeSelection(recipe.id)}
-                      trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
-                      thumbColor="#fffdf8"
-                    />
+                <View style={styles.selectionRow}>
+                  <View style={styles.selectionContent}>
+                    <Text style={styles.selectionTitle}>Meal plan</Text>
+                    <Text style={styles.selectionDetail}>
+                      Pull from {plannedRecipesForGroceries.length} planned day
+                      {plannedRecipesForGroceries.length === 1 ? "" : "s"}.
+                    </Text>
                   </View>
-                ))}
+                  <Switch
+                    value={includeMealPlanGroceries}
+                    onValueChange={setIncludeMealPlanGroceries}
+                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
+                    thumbColor="#fffdf8"
+                  />
+                </View>
+                {includeMealPlanGroceries && plannedRecipesForGroceries.length > 0 ? (
+                  <View style={styles.sourcePreviewBlock}>
+                    {plannedRecipesForGroceries.map(({ day, recipe }) => (
+                      <View key={`${day}-${recipe.id}`} style={styles.sourcePreviewRow}>
+                        <Text style={styles.sourcePreviewTitle}>{day}</Text>
+                        <Text style={styles.sourcePreviewDetail}>{recipe.title}</Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={styles.selectionRow}>
+                  <View style={styles.selectionContent}>
+                    <Text style={styles.selectionTitle}>Manual recipe picks</Text>
+                    <Text style={styles.selectionDetail}>
+                      Select recipes outside the weekly meal plan.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={includeManualRecipeGroceries}
+                    onValueChange={setIncludeManualRecipeGroceries}
+                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
+                    thumbColor="#fffdf8"
+                  />
+                </View>
+                {includeManualRecipeGroceries ? (
+                  <View style={styles.sourcePreviewBlock}>
+                    {data.recipes.map((recipe) => (
+                      <View key={recipe.id} style={styles.selectionRow}>
+                        <Pressable style={styles.selectionContent} onPress={() => toggleRecipeSelection(recipe.id)}>
+                          <Text style={styles.selectionTitle}>{recipe.title}</Text>
+                          <Text style={styles.selectionDetail}>{recipe.categories.join(" • ")}</Text>
+                        </Pressable>
+                        <Switch
+                          value={selectedRecipeIds.includes(recipe.id)}
+                          onValueChange={() => toggleRecipeSelection(recipe.id)}
+                          trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
+                          thumbColor="#fffdf8"
+                        />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                <View style={styles.selectionRow}>
+                  <View style={styles.selectionContent}>
+                    <Text style={styles.selectionTitle}>Essentials</Text>
+                    <Text style={styles.selectionDetail}>
+                      Always-available staples like milk, eggs, fruit, and pantry basics.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={includeEssentialGroceries}
+                    onValueChange={setIncludeEssentialGroceries}
+                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
+                    thumbColor="#fffdf8"
+                  />
+                </View>
+                <View style={styles.inlineButtonRow}>
+                  <Pressable
+                    style={styles.ghostButton}
+                    onPress={() => setManageEssentials((current) => !current)}
+                  >
+                    <Text style={styles.ghostButtonLabel}>
+                      {manageEssentials ? "Done managing essentials" : "Manage essentials"}
+                    </Text>
+                  </Pressable>
+                </View>
+                {includeEssentialGroceries && data.groceryEssentials.length > 0 ? (
+                  <View style={styles.sourcePreviewBlock}>
+                    {data.groceryEssentials.map((ingredient) => (
+                      <View key={ingredient.id} style={styles.essentialRow}>
+                        <View style={styles.selectionContent}>
+                          <Text style={styles.selectionTitle}>{formatIngredientLine(ingredient)}</Text>
+                          {ingredient.notes ? (
+                            <Text style={styles.selectionDetail}>{ingredient.notes}</Text>
+                          ) : null}
+                        </View>
+                        <Pressable style={styles.ghostButton} onPress={() => removeGroceryEssential(ingredient.id)}>
+                          <Text style={styles.ghostButtonLabel}>Remove</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+                {manageEssentials ? (
+                  <View style={styles.manageEssentialsCard}>
+                    <Text style={styles.cardTitle}>Add essential item</Text>
+                    <Text style={styles.supportingText}>
+                      Save common groceries here so they can be added to future shopping lists with one switch.
+                    </Text>
+                    <View style={styles.ingredientRow}>
+                      <View style={styles.quantityFieldWrap}>
+                        <QuantityField
+                          label="Qty"
+                          value={groceryDraft.quantity}
+                          placeholder="1"
+                          onChange={(value) => setGroceryDraft((current) => ({ ...current, quantity: value }))}
+                        />
+                      </View>
+                      <View style={styles.unitSelectWrap}>
+                        <SelectField
+                          label="Unit"
+                          value={groceryDraft.unit}
+                          placeholder="Unit"
+                          options={UNIT_OPTIONS}
+                          expanded={expandedGroceryUnit}
+                          onToggle={() => setExpandedGroceryUnit((current) => !current)}
+                          onSelect={(value) => {
+                            setGroceryDraft((current) => ({ ...current, unit: value }));
+                            setExpandedGroceryUnit(false);
+                          }}
+                        />
+                      </View>
+                    </View>
+                    <TextInput
+                      value={groceryDraft.name}
+                      onChangeText={(value) => setGroceryDraft((current) => ({ ...current, name: value }))}
+                      placeholder="Essential item name"
+                      placeholderTextColor="#8a7d6f"
+                      style={styles.input}
+                    />
+                    <TextInput
+                      value={groceryDraft.notes}
+                      onChangeText={(value) => setGroceryDraft((current) => ({ ...current, notes: value }))}
+                      placeholder="Optional note"
+                      placeholderTextColor="#8a7d6f"
+                      style={styles.input}
+                    />
+                    <Pressable style={styles.secondaryButton} onPress={addGroceryEssential}>
+                      <Text style={styles.secondaryButtonLabel}>Add essential</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
               </View>
 
               <View style={styles.heroCard}>
-                <Text style={styles.cardTitle}>Combined shopping list</Text>
+                <View style={styles.sectionHeading}>
+                  <View>
+                    <Text style={styles.cardTitle}>Combined shopping list</Text>
+                    <Text style={styles.sectionDetail}>Check items off while you shop.</Text>
+                  </View>
+                  <Pressable style={styles.ghostButton} onPress={clearCheckedGroceries}>
+                    <Text style={styles.ghostButtonLabel}>Reset checks</Text>
+                  </Pressable>
+                </View>
                 {groceryItems.length === 0 ? (
-                  <Text style={styles.supportingText}>Select at least one recipe to generate the list.</Text>
+                  <Text style={styles.supportingText}>
+                    Turn on a source and add at least one planned recipe, manual recipe, or essential item.
+                  </Text>
                 ) : (
                   groceryItems.map((item) => (
-                    <View key={`${item.label}-${item.recipes.join("-")}`} style={styles.groceryRow}>
-                      <Text style={styles.groceryItem}>{item.label}</Text>
-                      <Text style={styles.grocerySources}>{item.recipes.join(", ")}</Text>
+                    <View key={item.key} style={styles.groceryRow}>
+                      <Pressable style={styles.groceryCheckRow} onPress={() => toggleCheckedGroceryItem(item.key)}>
+                        <View
+                          style={[
+                            styles.groceryCheckbox,
+                            data.checkedGroceryItemKeys.includes(item.key) && styles.groceryCheckboxChecked,
+                          ]}
+                        >
+                          {data.checkedGroceryItemKeys.includes(item.key) ? (
+                            <Text style={styles.groceryCheckboxMark}>✓</Text>
+                          ) : null}
+                        </View>
+                        <View style={styles.selectionContent}>
+                          <Text
+                            style={[
+                              styles.groceryItem,
+                              data.checkedGroceryItemKeys.includes(item.key) && styles.groceryItemChecked,
+                            ]}
+                          >
+                            {item.label}
+                          </Text>
+                          <Text style={styles.grocerySources}>{item.recipes.join(", ")}</Text>
+                        </View>
+                      </Pressable>
                     </View>
                   ))
                 )}
@@ -752,6 +1031,8 @@ function QuantityField({
     return nextValue === 0 ? "" : Number(nextValue.toFixed(2)).toString();
   }
 
+  const displayValue = value || "1";
+
   return (
     <View style={styles.selectField}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -760,7 +1041,7 @@ function QuantityField({
           <Text style={styles.quantityAdjustButtonLabel}>-</Text>
         </Pressable>
         <TextInput
-          value={value}
+          value={displayValue}
           onChangeText={onChange}
           placeholder={placeholder}
           placeholderTextColor="#8a7d6f"
@@ -1791,6 +2072,49 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     gap: 12,
   },
+  sourcePreviewBlock: {
+    backgroundColor: "#fdf6ed",
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: "#eadbc7",
+    gap: 4,
+  },
+  sourcePreviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  sourcePreviewTitle: {
+    color: "#8d4a28",
+    fontSize: 13,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  sourcePreviewDetail: {
+    color: "#1f2f25",
+    fontSize: 15,
+    fontWeight: "700",
+    flexShrink: 1,
+    textAlign: "right",
+  },
+  essentialRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 6,
+  },
+  manageEssentialsCard: {
+    backgroundColor: "#fdf6ed",
+    borderRadius: 18,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#eadbc7",
+    gap: 12,
+  },
   selectionContent: {
     flex: 1,
   },
@@ -1809,10 +2133,40 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     gap: 4,
   },
+  groceryCheckRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  groceryCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 1,
+    borderColor: "#bcae9e",
+    backgroundColor: "#fffdf8",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  groceryCheckboxChecked: {
+    backgroundColor: "#3f6a52",
+    borderColor: "#3f6a52",
+  },
+  groceryCheckboxMark: {
+    color: "#fff9f1",
+    fontWeight: "800",
+    fontSize: 14,
+    lineHeight: 16,
+  },
   groceryItem: {
     color: "#1f2f25",
     fontWeight: "700",
     fontSize: 16,
+  },
+  groceryItemChecked: {
+    color: "#766858",
+    textDecorationLine: "line-through",
   },
   grocerySources: {
     color: "#766858",
