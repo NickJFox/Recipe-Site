@@ -22,17 +22,14 @@ import {
 } from "./src/constants";
 import { sampleData } from "./src/sampleData";
 import { loadAppData, saveAppData } from "./src/storage";
-import { AppData, ImportDraft, Ingredient, Recipe, RecipeCategory, RecipeSection } from "./src/types";
+import { AppData, ImportDraft, Ingredient, MealPlanDay, Recipe, RecipeCategory, RecipeSection } from "./src/types";
 import {
-  buildRecipeFromImport,
   cleanRecipe,
   createEmptyIngredient,
   createEmptyRecipe,
   createEmptyRecipeSection,
-  createId,
   detectSourceType,
   getRecipeIngredientCount,
-  guessTitleFromUrl,
   mergeGroceryItems,
 } from "./src/utils";
 
@@ -48,6 +45,33 @@ const TABS: Array<{ key: "home" | "recipe-form" | "imports" | "grocery"; label: 
   { key: "imports", label: "Meal Plan" },
   { key: "grocery", label: "Groceries" },
 ];
+
+const WEEK_DAYS: MealPlanDay[] = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+function createEmptyMealPlan() {
+  return WEEK_DAYS.map((day) => ({ day, recipeId: null }));
+}
+
+function normalizeAppData(appData: AppData | { recipes: Recipe[]; importDrafts: ImportDraft[] }) {
+  const mealPlanSource = "mealPlan" in appData && Array.isArray(appData.mealPlan) ? appData.mealPlan : [];
+
+  return {
+    recipes: appData.recipes.map(normalizeRecipe),
+    importDrafts: appData.importDrafts ?? [],
+    mealPlan: WEEK_DAYS.map((day) => ({
+      day,
+      recipeId: mealPlanSource.find((entry) => entry.day === day)?.recipeId ?? null,
+    })),
+  } satisfies AppData;
+}
 
 function normalizeRecipe(recipe: Recipe): Recipe {
   const legacyCategory = (recipe as Recipe & { category?: RecipeCategory }).category;
@@ -85,25 +109,18 @@ function formatIngredientLine(ingredient: Ingredient) {
 }
 
 export default function App() {
-  const [data, setData] = useState<AppData>({
-    recipes: sampleData.recipes.map(normalizeRecipe),
-    importDrafts: sampleData.importDrafts,
-  });
+  const [data, setData] = useState<AppData>(normalizeAppData(sampleData));
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<RecipeCategory | "All">("All");
-  const [importUrl, setImportUrl] = useState("");
-  const [importNotes, setImportNotes] = useState("");
   const [selectedRecipeIds, setSelectedRecipeIds] = useState<string[]>([]);
+  const [expandedMealPlanDay, setExpandedMealPlanDay] = useState<MealPlanDay | null>(null);
 
   useEffect(() => {
     async function bootstrap() {
       const stored = await loadAppData();
       if (stored) {
-        setData({
-          recipes: stored.recipes.map((recipe) => normalizeRecipe(recipe as Recipe)),
-          importDrafts: stored.importDrafts,
-        });
+        setData(normalizeAppData(stored));
       }
       setLoading(false);
     }
@@ -157,6 +174,7 @@ export default function App() {
     setData((current) => {
       const exists = current.recipes.some((item) => item.id === cleaned.id);
       return {
+        ...current,
         recipes: exists
           ? current.recipes.map((item) => (item.id === cleaned.id ? cleaned : item))
           : [cleaned, ...current.recipes],
@@ -172,6 +190,10 @@ export default function App() {
     setData((current) => ({
       ...current,
       recipes: current.recipes.filter((recipe) => recipe.id !== recipeId),
+      mealPlan: current.mealPlan.map((entry) => ({
+        ...entry,
+        recipeId: entry.recipeId === recipeId ? null : entry.recipeId,
+      })),
     }));
     setSelectedRecipeIds((current) => current.filter((id) => id !== recipeId));
     setScreen({ name: "home" });
@@ -186,40 +208,59 @@ export default function App() {
     }));
   }
 
-  function handleCreateImport() {
-    if (!importUrl.trim()) {
-      return;
-    }
-
-    const draft: ImportDraft = {
-      id: createId("import"),
-      url: importUrl.trim(),
-      sourceType: detectSourceType(importUrl.trim()),
-      titleGuess: guessTitleFromUrl(importUrl.trim()),
-      notes: importNotes.trim(),
-      createdAt: new Date().toISOString(),
-    };
-
-    setData((current) => ({
-      ...current,
-      importDrafts: [draft, ...current.importDrafts],
-    }));
-    setImportUrl("");
-    setImportNotes("");
-  }
-
-  function handleRemoveImport(id: string) {
-    setData((current) => ({
-      ...current,
-      importDrafts: current.importDrafts.filter((draft) => draft.id !== id),
-    }));
-  }
-
   function toggleRecipeSelection(recipeId: string) {
     setSelectedRecipeIds((current) =>
       current.includes(recipeId) ? current.filter((id) => id !== recipeId) : [...current, recipeId]
     );
   }
+
+  function assignMealPlanRecipe(day: MealPlanDay, recipeId: string | null) {
+    setData((current) => ({
+      ...current,
+      mealPlan: current.mealPlan.map((entry) => (entry.day === day ? { ...entry, recipeId } : entry)),
+    }));
+    setExpandedMealPlanDay(null);
+  }
+
+  function autoFillMealPlan() {
+    if (data.recipes.length === 0) {
+      return;
+    }
+
+    const recipePool = [...data.recipes].sort((first, second) => {
+      if (first.favorite !== second.favorite) {
+        return first.favorite ? -1 : 1;
+      }
+
+      return first.title.localeCompare(second.title);
+    });
+
+    setData((current) => ({
+      ...current,
+      mealPlan: current.mealPlan.map((entry, index) => ({
+        ...entry,
+        recipeId: recipePool[index % recipePool.length]?.id ?? null,
+      })),
+    }));
+    setExpandedMealPlanDay(null);
+  }
+
+  function clearMealPlan() {
+    setData((current) => ({
+      ...current,
+      mealPlan: createEmptyMealPlan(),
+    }));
+    setExpandedMealPlanDay(null);
+  }
+
+  const plannedRecipes = useMemo(
+    () =>
+      data.mealPlan.map((entry) => ({
+        ...entry,
+        recipe: data.recipes.find((recipe) => recipe.id === entry.recipeId) ?? null,
+      })),
+    [data.mealPlan, data.recipes]
+  );
 
   const activeRecipe =
     screen.name === "recipe-detail"
@@ -232,7 +273,7 @@ export default function App() {
       <View style={styles.appShell}>
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Recipe Book</Text>
-          <Text style={styles.title}>Recipes you love - Building meal plans and grocery lists.</Text>
+          <Text style={styles.title}>Recipes you love while making meal planning and grocery shopping easier.</Text>
           <Text style={styles.subtitle}>
             Save recipes by category, build meal plans, and create grocery list from multiple meals.
           </Text>
@@ -335,61 +376,94 @@ export default function App() {
 
           {screen.name === "imports" && (
             <View style={styles.screenBlock}>
-              <SectionHeading title="Import Recipes" detail="Queue links and social posts for cleanup" />
+              <SectionHeading title="Weekly Meal Plan" detail="Build your week from recipes already in your library" />
               <View style={styles.heroCard}>
-                <Text style={styles.cardTitle}>Add a recipe link or social post</Text>
+                <Text style={styles.cardTitle}>Plan the week</Text>
                 <Text style={styles.supportingText}>
-                  Instagram, TikTok, YouTube, and normal recipe URLs are stored as import drafts.
-                  This local app does not scrape those services directly, so you can review and finish
-                  the recipe details before saving.
+                  Pick a recipe for each day or let the app fill the calendar automatically using
+                  recipes you have already saved.
                 </Text>
-                <TextInput
-                  value={importUrl}
-                  onChangeText={setImportUrl}
-                  placeholder="Paste a recipe URL or social video link"
-                  placeholderTextColor="#8a7d6f"
-                  style={styles.input}
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  value={importNotes}
-                  onChangeText={setImportNotes}
-                  placeholder="Optional notes, caption text, or ingredients you copied"
-                  placeholderTextColor="#8a7d6f"
-                  multiline
-                  style={[styles.input, styles.textArea]}
-                />
-                <Pressable style={styles.primaryButton} onPress={handleCreateImport}>
-                  <Text style={styles.primaryButtonLabel}>Create import draft</Text>
-                </Pressable>
+                <View style={styles.inlineButtonRow}>
+                  <Pressable style={styles.primaryButton} onPress={autoFillMealPlan}>
+                    <Text style={styles.primaryButtonLabel}>Auto-fill week</Text>
+                  </Pressable>
+                  <Pressable style={styles.ghostButton} onPress={clearMealPlan}>
+                    <Text style={styles.ghostButtonLabel}>Clear plan</Text>
+                  </Pressable>
+                </View>
               </View>
 
               <View style={styles.cardGrid}>
-                {data.importDrafts.map((draft) => (
-                  <View key={draft.id} style={styles.recipeCard}>
-                    <Text style={styles.recipeCategory}>{SOURCE_LABELS[draft.sourceType]}</Text>
-                    <Text style={styles.recipeTitle}>{draft.titleGuess}</Text>
-                    <Text style={styles.recipeDescription}>{draft.url}</Text>
-                    <Text style={styles.supportingText}>
-                      {draft.notes || "Open this draft and finish the ingredients and instructions manually."}
-                    </Text>
-                    <View style={styles.inlineButtonRow}>
+                {plannedRecipes.map((entry) => (
+                  <View key={entry.day} style={styles.mealPlanCard}>
+                    <View style={styles.mealPlanHeader}>
+                      <Text style={styles.recipeCategory}>{entry.day}</Text>
                       <Pressable
-                        style={styles.secondaryButton}
+                        style={styles.mealPlanAction}
                         onPress={() =>
-                          setScreen({
-                            name: "recipe-form",
-                            draft: normalizeRecipe(buildRecipeFromImport(draft)),
-                            importDraftId: draft.id,
-                          })
+                          setExpandedMealPlanDay((current) => (current === entry.day ? null : entry.day))
                         }
                       >
-                        <Text style={styles.secondaryButtonLabel}>Finish recipe</Text>
-                      </Pressable>
-                      <Pressable style={styles.ghostButton} onPress={() => handleRemoveImport(draft.id)}>
-                        <Text style={styles.ghostButtonLabel}>Remove</Text>
+                        <Text style={styles.mealPlanActionLabel}>
+                          {expandedMealPlanDay === entry.day ? "Hide" : "Choose"}
+                        </Text>
                       </Pressable>
                     </View>
+
+                    {entry.recipe ? (
+                      <>
+                        <Text style={styles.recipeTitle}>{entry.recipe.title}</Text>
+                        <Text style={styles.recipeDescription}>
+                          {entry.recipe.description || entry.recipe.categories.join(" • ")}
+                        </Text>
+                        <View style={styles.metaRow}>
+                          <MetaPill label={entry.recipe.categories.join(" • ")} />
+                          {entry.recipe.prepTime ? <MetaPill label={entry.recipe.prepTime} /> : null}
+                        </View>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.recipeTitle}>No recipe planned</Text>
+                        <Text style={styles.supportingText}>
+                          Choose a saved recipe for {entry.day.toLowerCase()} or auto-fill the week.
+                        </Text>
+                      </>
+                    )}
+
+                    {expandedMealPlanDay === entry.day ? (
+                      <View style={styles.mealPlanPicker}>
+                        <Pressable style={styles.ghostButton} onPress={() => assignMealPlanRecipe(entry.day, null)}>
+                          <Text style={styles.ghostButtonLabel}>Clear day</Text>
+                        </Pressable>
+                        {data.recipes.map((recipe) => {
+                          const selected = recipe.id === entry.recipeId;
+                          return (
+                            <Pressable
+                              key={`${entry.day}-${recipe.id}`}
+                              style={[styles.mealPlanOption, selected && styles.mealPlanOptionActive]}
+                              onPress={() => assignMealPlanRecipe(entry.day, recipe.id)}
+                            >
+                              <Text
+                                style={[
+                                  styles.mealPlanOptionTitle,
+                                  selected && styles.mealPlanOptionTitleActive,
+                                ]}
+                              >
+                                {recipe.title}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.mealPlanOptionDetail,
+                                  selected && styles.mealPlanOptionDetailActive,
+                                ]}
+                              >
+                                {recipe.categories.join(" • ")}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -1423,6 +1497,31 @@ const styles = StyleSheet.create({
   cardGrid: {
     gap: 12,
   },
+  mealPlanCard: {
+    backgroundColor: "#fff9f1",
+    borderRadius: 22,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    gap: 10,
+  },
+  mealPlanHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
+  },
+  mealPlanAction: {
+    backgroundColor: "#eadbc7",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  mealPlanActionLabel: {
+    color: "#5a4636",
+    fontSize: 13,
+    fontWeight: "700",
+  },
   recipeCard: {
     backgroundColor: "#fff9f1",
     borderRadius: 22,
@@ -1718,6 +1817,38 @@ const styles = StyleSheet.create({
   grocerySources: {
     color: "#766858",
     fontSize: 13,
+  },
+  mealPlanPicker: {
+    gap: 8,
+    marginTop: 2,
+  },
+  mealPlanOption: {
+    backgroundColor: "#f8f0e5",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#d7c9b6",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 4,
+  },
+  mealPlanOptionActive: {
+    backgroundColor: "#1f2f25",
+    borderColor: "#1f2f25",
+  },
+  mealPlanOptionTitle: {
+    color: "#1f2f25",
+    fontSize: 15,
+    fontWeight: "700",
+  },
+  mealPlanOptionTitleActive: {
+    color: "#fff9f1",
+  },
+  mealPlanOptionDetail: {
+    color: "#766858",
+    fontSize: 13,
+  },
+  mealPlanOptionDetailActive: {
+    color: "#eadbc7",
   },
   editorImagePreview: {
     width: "100%",

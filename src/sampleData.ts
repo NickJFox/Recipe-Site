@@ -75,4 +75,13 @@ export const sampleData: AppData = {
     },
   ],
   importDrafts: [],
+  mealPlan: [
+    { day: "Monday", recipeId: null },
+    { day: "Tuesday", recipeId: null },
+    { day: "Wednesday", recipeId: null },
+    { day: "Thursday", recipeId: null },
+    { day: "Friday", recipeId: null },
+    { day: "Saturday", recipeId: null },
+    { day: "Sunday", recipeId: null },
+  ],
 };

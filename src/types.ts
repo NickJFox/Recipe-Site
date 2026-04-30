@@ -58,7 +58,22 @@ export type ImportDraft = {
   createdAt: string;
 };
 
+export type MealPlanDay =
+  | "Monday"
+  | "Tuesday"
+  | "Wednesday"
+  | "Thursday"
+  | "Friday"
+  | "Saturday"
+  | "Sunday";
+
+export type MealPlanEntry = {
+  day: MealPlanDay;
+  recipeId: string | null;
+};
+
 export type AppData = {
   recipes: Recipe[];
   importDrafts: ImportDraft[];
+  mealPlan: MealPlanEntry[];
 };
