@@ -4,8 +4,7 @@ export type RecipeCategory =
   | "Dinner"
   | "Dessert"
   | "Snack"
-  | "Drink"
-  | "Meal Prep";
+  | "Drink";
 
 export type RecipeSourceType =
   | "manual"

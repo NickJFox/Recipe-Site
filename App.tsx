@@ -432,7 +432,7 @@ export default function App() {
                 onAction={openNewRecipeForm}
               />
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
+              <View style={styles.categoryFilterGrid}>
                 <FilterChip
                   label="All"
                   active={selectedCategory === "All"}
@@ -446,7 +446,7 @@ export default function App() {
                     onPress={() => setSelectedCategory(category)}
                   />
                 ))}
-              </ScrollView>
+              </View>
 
               <View style={styles.cardGrid}>
                 {filteredRecipes.map((recipe) => (
@@ -1755,15 +1755,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  chipScroll: {
-    marginHorizontal: -2,
+  categoryFilterGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
   chip: {
     backgroundColor: "#eadbc7",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
-    marginRight: 10,
   },
   chipActive: {
     backgroundColor: "#b85c38",

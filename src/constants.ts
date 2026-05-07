@@ -7,7 +7,6 @@ export const CATEGORY_OPTIONS: RecipeCategory[] = [
   "Dessert",
   "Snack",
   "Drink",
-  "Meal Prep",
 ];
 
 export const SOURCE_LABELS = {
