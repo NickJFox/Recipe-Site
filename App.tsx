@@ -1212,21 +1212,6 @@ function RecipeStart({
     }
   }
 
-  function continueWithLinkOnly() {
-    const trimmedUrl = url.trim();
-    if (!trimmedUrl) {
-      setImportError("Paste a recipe link first.");
-      return;
-    }
-
-    onImportedDraft({
-      ...createEmptyRecipe(detectSourceType(trimmedUrl)),
-      title: "Imported Recipe",
-      sourceUrl: trimmedUrl,
-      sourceLabel: trimmedUrl,
-    });
-  }
-
   return (
     <View style={styles.screenBlock}>
       <SectionHeading title="Add Recipe" detail="Start from scratch or import a public recipe page" />
@@ -1262,9 +1247,6 @@ function RecipeStart({
         <View style={styles.inlineButtonRow}>
           <Pressable style={styles.secondaryButton} onPress={() => void importFromLink()} disabled={importing}>
             <Text style={styles.secondaryButtonLabel}>{importing ? "Importing..." : "Import and save"}</Text>
-          </Pressable>
-          <Pressable style={styles.ghostButton} onPress={continueWithLinkOnly}>
-            <Text style={styles.ghostButtonLabel}>Use link only</Text>
           </Pressable>
         </View>
       </View>
