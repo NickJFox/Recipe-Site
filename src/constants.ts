@@ -54,7 +54,6 @@ export const TAG_OPTIONS = [
   "family favorite",
   "vegetarian",
   "high protein",
-  "meal prep",
   "freezer-friendly",
   "gluten-free",
   "spicy",
