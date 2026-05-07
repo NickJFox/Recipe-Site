@@ -606,8 +606,8 @@ export default function App() {
                   <Switch
                     value={includeMealPlanGroceries}
                     onValueChange={setIncludeMealPlanGroceries}
-                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
-                    thumbColor="#fffdf8"
+                    trackColor={{ false: "#d9dee8", true: "#14b8a6" }}
+                    thumbColor="#ffffff"
                   />
                 </View>
                 {includeMealPlanGroceries && plannedRecipesForGroceries.length > 0 ? (
@@ -631,8 +631,8 @@ export default function App() {
                   <Switch
                     value={includeManualRecipeGroceries}
                     onValueChange={setIncludeManualRecipeGroceries}
-                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
-                    thumbColor="#fffdf8"
+                    trackColor={{ false: "#d9dee8", true: "#14b8a6" }}
+                    thumbColor="#ffffff"
                   />
                 </View>
                 {includeManualRecipeGroceries ? (
@@ -646,8 +646,8 @@ export default function App() {
                         <Switch
                           value={selectedRecipeIds.includes(recipe.id)}
                           onValueChange={() => toggleRecipeSelection(recipe.id)}
-                          trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
-                          thumbColor="#fffdf8"
+                          trackColor={{ false: "#d9dee8", true: "#14b8a6" }}
+                          thumbColor="#ffffff"
                         />
                       </View>
                     ))}
@@ -664,8 +664,8 @@ export default function App() {
                   <Switch
                     value={includeEssentialGroceries}
                     onValueChange={setIncludeEssentialGroceries}
-                    trackColor={{ false: "#d9cbb8", true: "#3f6a52" }}
-                    thumbColor="#fffdf8"
+                    trackColor={{ false: "#d9dee8", true: "#14b8a6" }}
+                    thumbColor="#ffffff"
                   />
                 </View>
                 <View style={styles.inlineButtonRow}>
@@ -729,14 +729,14 @@ export default function App() {
                       value={groceryDraft.name}
                       onChangeText={(value) => setGroceryDraft((current) => ({ ...current, name: value }))}
                       placeholder="Essential item name"
-                      placeholderTextColor="#8a7d6f"
+                      placeholderTextColor="#7c8798"
                       style={styles.input}
                     />
                     <TextInput
                       value={groceryDraft.notes}
                       onChangeText={(value) => setGroceryDraft((current) => ({ ...current, notes: value }))}
                       placeholder="Optional note"
-                      placeholderTextColor="#8a7d6f"
+                      placeholderTextColor="#7c8798"
                       style={styles.input}
                     />
                     <Pressable style={styles.secondaryButton} onPress={addGroceryEssential}>
@@ -1002,7 +1002,7 @@ function TagsInputField({
           )
         }
         placeholder="Add tags separated by commas"
-        placeholderTextColor="#8a7d6f"
+        placeholderTextColor="#7c8798"
         style={styles.input}
       />
     </View>
@@ -1044,7 +1044,7 @@ function QuantityField({
           value={displayValue}
           onChangeText={onChange}
           placeholder={placeholder}
-          placeholderTextColor="#8a7d6f"
+          placeholderTextColor="#7c8798"
           keyboardType="decimal-pad"
           style={styles.quantityEditorInput}
         />
@@ -1100,14 +1100,14 @@ function IngredientEditor({
         value={ingredient.name}
         onChangeText={(value) => onUpdate("name", value)}
         placeholder="Ingredient name"
-        placeholderTextColor="#8a7d6f"
+        placeholderTextColor="#7c8798"
         style={styles.input}
       />
       <TextInput
         value={ingredient.notes}
         onChangeText={(value) => onUpdate("notes", value)}
         placeholder="Notes"
-        placeholderTextColor="#8a7d6f"
+        placeholderTextColor="#7c8798"
         style={styles.input}
       />
       <Pressable style={styles.ghostButton} onPress={onRemove}>
@@ -1135,7 +1135,7 @@ function InstructionEditor({
         value={value}
         onChangeText={onChange}
         placeholder="Write the cooking step"
-        placeholderTextColor="#8a7d6f"
+        placeholderTextColor="#7c8798"
         multiline
         style={[styles.input, styles.textArea]}
       />
@@ -1367,14 +1367,14 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
           value={recipe.title}
           onChangeText={(value) => setRecipe((current) => ({ ...current, title: value }))}
           placeholder="Recipe title"
-          placeholderTextColor="#8a7d6f"
+          placeholderTextColor="#7c8798"
           style={styles.input}
         />
         <TextInput
           value={recipe.description}
           onChangeText={(value) => setRecipe((current) => ({ ...current, description: value }))}
           placeholder="Short description"
-          placeholderTextColor="#8a7d6f"
+          placeholderTextColor="#7c8798"
           multiline
           style={[styles.input, styles.textArea]}
         />
@@ -1440,7 +1440,7 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
             }))
           }
           placeholder="Source URL if you have one"
-          placeholderTextColor="#8a7d6f"
+          placeholderTextColor="#7c8798"
           autoCapitalize="none"
           style={styles.input}
         />
@@ -1499,7 +1499,7 @@ function RecipeForm({ draft, importDraftId, onCancel, onSave }: RecipeFormProps)
                 }))
               }
               placeholder="Sub-recipe title"
-              placeholderTextColor="#8a7d6f"
+              placeholderTextColor="#7c8798"
               style={styles.input}
             />
             <Text style={styles.fieldLabel}>Ingredients</Text>
@@ -1651,7 +1651,7 @@ function RecipeDetail({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f4ede0",
+    backgroundColor: "#f6f7fb",
   },
   appShell: {
     flex: 1,
@@ -1659,28 +1659,28 @@ const styles = StyleSheet.create({
     paddingTop: 16,
   },
   header: {
-    backgroundColor: "#fff9f1",
+    backgroundColor: "#ffffff",
     borderRadius: 28,
     padding: 22,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     gap: 8,
   },
   eyebrow: {
-    color: "#8d4a28",
+    color: "#2563eb",
     fontSize: 13,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 1.4,
   },
   title: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 36,
   },
   subtitle: {
-    color: "#5c564f",
+    color: "#5f6b7a",
     fontSize: 15,
     lineHeight: 22,
   },
@@ -1692,21 +1692,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tab: {
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
   },
   tabActive: {
-    backgroundColor: "#1f2f25",
+    backgroundColor: "#171a21",
   },
   tabLabel: {
-    color: "#5a4636",
+    color: "#394150",
     fontSize: 14,
     fontWeight: "700",
   },
   tabLabelActive: {
-    color: "#fff9f1",
+    color: "#ffffff",
   },
   scrollContent: {
     paddingBottom: 32,
@@ -1722,36 +1722,36 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   sectionTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 24,
     fontWeight: "800",
     flexShrink: 1,
   },
   sectionDetail: {
-    color: "#766858",
+    color: "#6b7280",
     fontSize: 14,
     marginTop: 4,
   },
   heroCard: {
-    backgroundColor: "#fff9f1",
+    backgroundColor: "#ffffff",
     borderRadius: 24,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     gap: 12,
   },
   cardTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 20,
     fontWeight: "800",
   },
   supportingText: {
-    color: "#655d54",
+    color: "#5f6b7a",
     fontSize: 14,
     lineHeight: 21,
   },
   errorText: {
-    color: "#7a2f1e",
+    color: "#dc2626",
     fontSize: 14,
     lineHeight: 20,
   },
@@ -1761,30 +1761,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 999,
   },
   chipActive: {
-    backgroundColor: "#b85c38",
+    backgroundColor: "#2563eb",
   },
   chipLabel: {
-    color: "#5a4636",
+    color: "#394150",
     fontWeight: "700",
   },
   chipLabelActive: {
-    color: "#fff9f1",
+    color: "#ffffff",
   },
   cardGrid: {
     gap: 12,
   },
   mealPlanCard: {
-    backgroundColor: "#fff9f1",
+    backgroundColor: "#ffffff",
     borderRadius: 22,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     gap: 10,
   },
   mealPlanHeader: {
@@ -1794,22 +1794,22 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   mealPlanAction: {
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
   },
   mealPlanActionLabel: {
-    color: "#5a4636",
+    color: "#394150",
     fontSize: 13,
     fontWeight: "700",
   },
   recipeCard: {
-    backgroundColor: "#fff9f1",
+    backgroundColor: "#ffffff",
     borderRadius: 22,
     padding: 18,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     gap: 10,
   },
   recipeCardHeader: {
@@ -1821,26 +1821,26 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 168,
     borderRadius: 18,
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
   },
   recipeCategory: {
-    color: "#8d4a28",
+    color: "#2563eb",
     fontSize: 13,
     fontWeight: "700",
     textTransform: "uppercase",
     letterSpacing: 1.1,
   },
   favoriteText: {
-    color: "#3f6a52",
+    color: "#14b8a6",
     fontWeight: "700",
   },
   recipeTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 22,
     fontWeight: "800",
   },
   recipeDescription: {
-    color: "#655d54",
+    color: "#5f6b7a",
     fontSize: 14,
     lineHeight: 21,
   },
@@ -1850,24 +1850,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   metaPill: {
-    backgroundColor: "#f0e4d4",
+    backgroundColor: "#e8edf5",
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   metaPillText: {
-    color: "#5a4636",
+    color: "#394150",
     fontSize: 12,
     fontWeight: "700",
   },
   input: {
-    backgroundColor: "#f8f0e5",
+    backgroundColor: "#f8fafc",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 15,
   },
   textArea: {
@@ -1875,7 +1875,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   fieldLabel: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontWeight: "800",
     fontSize: 16,
     marginTop: 4,
@@ -1906,68 +1906,68 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     alignItems: "center",
     justifyContent: "center",
   },
   quantityAdjustButtonLabel: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 20,
     fontWeight: "800",
     lineHeight: 22,
   },
   quantityEditorInput: {
     flex: 1,
-    backgroundColor: "#f8f0e5",
+    backgroundColor: "#f8fafc",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     paddingHorizontal: 14,
     paddingVertical: 10,
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 15,
     textAlign: "center",
   },
   selectTrigger: {
-    backgroundColor: "#f8f0e5",
+    backgroundColor: "#f8fafc",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
   selectTriggerText: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 15,
   },
   placeholderText: {
-    color: "#8a7d6f",
+    color: "#7c8798",
   },
   dropdownMenu: {
     maxHeight: 220,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
-    backgroundColor: "#fffdf8",
+    borderColor: "#d9dee8",
+    backgroundColor: "#ffffff",
   },
   dropdownOption: {
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#eadbc7",
+    borderBottomColor: "#eef2f7",
   },
   dropdownOptionActive: {
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
   },
   dropdownOptionText: {
-    color: "#5a4636",
+    color: "#394150",
     fontSize: 15,
     fontWeight: "600",
   },
   dropdownOptionTextActive: {
-    color: "#1f2f25",
+    color: "#171a21",
   },
   selectMenu: {
     flexDirection: "row",
@@ -1975,12 +1975,12 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   ingredientCard: {
-    backgroundColor: "#fdf6ed",
+    backgroundColor: "#f8fafc",
     borderRadius: 18,
     padding: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: "#eadbc7",
+    borderColor: "#eef2f7",
   },
   ingredientRow: {
     flexDirection: "row",
@@ -1991,27 +1991,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   instructionCard: {
-    backgroundColor: "#fdf6ed",
+    backgroundColor: "#f8fafc",
     borderRadius: 18,
     padding: 14,
     gap: 10,
     borderWidth: 1,
-    borderColor: "#eadbc7",
+    borderColor: "#eef2f7",
   },
   stepNumber: {
-    color: "#8d4a28",
+    color: "#2563eb",
     fontWeight: "700",
   },
   subRecipeCard: {
-    backgroundColor: "#fff4e6",
+    backgroundColor: "#f1f5f9",
     borderRadius: 20,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#e3c8a7",
+    borderColor: "#cfd8e6",
     gap: 12,
   },
   primaryButton: {
-    backgroundColor: "#1f2f25",
+    backgroundColor: "#171a21",
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -2019,12 +2019,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   primaryButtonLabel: {
-    color: "#fff9f1",
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 15,
   },
   secondaryButton: {
-    backgroundColor: "#b85c38",
+    backgroundColor: "#2563eb",
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -2032,7 +2032,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   secondaryButtonLabel: {
-    color: "#fff9f1",
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 15,
   },
@@ -2041,16 +2041,16 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     alignItems: "center",
     justifyContent: "center",
   },
   ghostButtonLabel: {
-    color: "#5a4636",
+    color: "#394150",
     fontWeight: "700",
   },
   deleteButton: {
-    backgroundColor: "#7a2f1e",
+    backgroundColor: "#dc2626",
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -2058,7 +2058,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   deleteButtonLabel: {
-    color: "#fff9f1",
+    color: "#ffffff",
     fontWeight: "800",
   },
   inlineButtonRow: {
@@ -2074,12 +2074,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   sourcePreviewBlock: {
-    backgroundColor: "#fdf6ed",
+    backgroundColor: "#f8fafc",
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: "#eadbc7",
+    borderColor: "#eef2f7",
     gap: 4,
   },
   sourcePreviewRow: {
@@ -2090,13 +2090,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   sourcePreviewTitle: {
-    color: "#8d4a28",
+    color: "#2563eb",
     fontSize: 13,
     fontWeight: "700",
     textTransform: "uppercase",
   },
   sourcePreviewDetail: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 15,
     fontWeight: "700",
     flexShrink: 1,
@@ -2109,28 +2109,28 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   manageEssentialsCard: {
-    backgroundColor: "#fdf6ed",
+    backgroundColor: "#f8fafc",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#eadbc7",
+    borderColor: "#eef2f7",
     gap: 12,
   },
   selectionContent: {
     flex: 1,
   },
   selectionTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontWeight: "700",
     fontSize: 16,
   },
   selectionDetail: {
-    color: "#766858",
+    color: "#6b7280",
     marginTop: 4,
   },
   groceryRow: {
     borderTopWidth: 1,
-    borderTopColor: "#eadbc7",
+    borderTopColor: "#eef2f7",
     paddingTop: 12,
     gap: 4,
   },
@@ -2144,33 +2144,33 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 7,
     borderWidth: 1,
-    borderColor: "#bcae9e",
-    backgroundColor: "#fffdf8",
+    borderColor: "#aab4c3",
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 1,
   },
   groceryCheckboxChecked: {
-    backgroundColor: "#3f6a52",
-    borderColor: "#3f6a52",
+    backgroundColor: "#14b8a6",
+    borderColor: "#14b8a6",
   },
   groceryCheckboxMark: {
-    color: "#fff9f1",
+    color: "#ffffff",
     fontWeight: "800",
     fontSize: 14,
     lineHeight: 16,
   },
   groceryItem: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontWeight: "700",
     fontSize: 16,
   },
   groceryItemChecked: {
-    color: "#766858",
+    color: "#6b7280",
     textDecorationLine: "line-through",
   },
   grocerySources: {
-    color: "#766858",
+    color: "#6b7280",
     fontSize: 13,
   },
   mealPlanPicker: {
@@ -2178,71 +2178,71 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   mealPlanOption: {
-    backgroundColor: "#f8f0e5",
+    backgroundColor: "#f8fafc",
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#d7c9b6",
+    borderColor: "#d9dee8",
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 4,
   },
   mealPlanOptionActive: {
-    backgroundColor: "#1f2f25",
-    borderColor: "#1f2f25",
+    backgroundColor: "#171a21",
+    borderColor: "#171a21",
   },
   mealPlanOptionTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontSize: 15,
     fontWeight: "700",
   },
   mealPlanOptionTitleActive: {
-    color: "#fff9f1",
+    color: "#ffffff",
   },
   mealPlanOptionDetail: {
-    color: "#766858",
+    color: "#6b7280",
     fontSize: 13,
   },
   mealPlanOptionDetailActive: {
-    color: "#eadbc7",
+    color: "#eef2f7",
   },
   editorImagePreview: {
     width: "100%",
     height: 220,
     borderRadius: 22,
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
   },
   detailImage: {
     width: "100%",
     height: 240,
     borderRadius: 22,
-    backgroundColor: "#eadbc7",
+    backgroundColor: "#eef2f7",
   },
   detailHeading: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontWeight: "800",
     fontSize: 18,
     marginTop: 8,
   },
   detailLine: {
-    color: "#4e473f",
+    color: "#394150",
     fontSize: 15,
     lineHeight: 23,
   },
   detailSectionCard: {
-    backgroundColor: "#fdf6ed",
+    backgroundColor: "#f8fafc",
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: "#eadbc7",
+    borderColor: "#eef2f7",
     gap: 6,
   },
   subRecipeTitle: {
-    color: "#1f2f25",
+    color: "#171a21",
     fontWeight: "800",
     fontSize: 17,
   },
   subRecipeHeading: {
-    color: "#8d4a28",
+    color: "#2563eb",
     fontWeight: "700",
     marginTop: 6,
   },
