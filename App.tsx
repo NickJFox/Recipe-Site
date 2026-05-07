@@ -4,6 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -24,6 +26,7 @@ import { sampleData } from "./src/sampleData";
 import { loadAppData, saveAppData } from "./src/storage";
 import { AppData, ImportDraft, Ingredient, MealPlanDay, Recipe, RecipeCategory, RecipeSection } from "./src/types";
 import {
+  buildRecipeFromUrl,
   cleanRecipe,
   createEmptyIngredient,
   createEmptyRecipe,
@@ -35,6 +38,7 @@ import {
 
 type Screen =
   | { name: "home" }
+  | { name: "recipe-start" }
   | { name: "recipe-form"; draft: Recipe; importDraftId?: string }
   | { name: "recipe-detail"; recipeId: string }
   | { name: "imports" }
@@ -220,7 +224,7 @@ export default function App() {
   ]);
 
   function openNewRecipeForm() {
-    setScreen({ name: "recipe-form", draft: createEmptyRecipe("manual") });
+    setScreen({ name: "recipe-start" });
   }
 
   function goToTopLevelScreen(name: "home" | "imports" | "grocery") {
@@ -387,7 +391,10 @@ export default function App() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
-      <View style={styles.appShell}>
+      <KeyboardAvoidingView
+        style={styles.appShell}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.header}>
           <Text style={styles.eyebrow}>Recipe Book</Text>
           <Text style={styles.title}>Recipes you love while making meal planning and grocery shopping easier.</Text>
@@ -422,7 +429,11 @@ export default function App() {
           ))}
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+        >
           {screen.name === "home" && (
             <View style={styles.screenBlock}>
               <SectionHeading
@@ -470,6 +481,15 @@ export default function App() {
                 ))}
               </View>
             </View>
+          )}
+
+          {screen.name === "recipe-start" && (
+            <RecipeStart
+              onManual={() => setScreen({ name: "recipe-form", draft: createEmptyRecipe("manual") })}
+              onImportedDraft={(draft) => setScreen({ name: "recipe-form", draft })}
+              onImportedSave={handleSaveRecipe}
+              onCancel={() => setScreen({ name: "home" })}
+            />
           )}
 
           {screen.name === "recipe-form" && (
@@ -793,7 +813,7 @@ export default function App() {
             </View>
           )}
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -1142,6 +1162,118 @@ function InstructionEditor({
       <Pressable style={styles.ghostButton} onPress={onRemove}>
         <Text style={styles.ghostButtonLabel}>Remove step</Text>
       </Pressable>
+    </View>
+  );
+}
+
+function RecipeStart({
+  onManual,
+  onImportedDraft,
+  onImportedSave,
+  onCancel,
+}: {
+  onManual: () => void;
+  onImportedDraft: (recipe: Recipe) => void;
+  onImportedSave: (recipe: Recipe) => void;
+  onCancel: () => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState("");
+
+  async function importFromLink() {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setImportError("Paste a recipe link first.");
+      return;
+    }
+
+    let navigatedAway = false;
+    setImporting(true);
+    setImportError("");
+
+    try {
+      const importedRecipe = await buildRecipeFromUrl(trimmedUrl);
+      if (hasRecipeContent(importedRecipe)) {
+        navigatedAway = true;
+        onImportedSave(importedRecipe);
+        return;
+      }
+
+      navigatedAway = true;
+      onImportedDraft(importedRecipe);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not parse this link.";
+      setImportError(`${message} You can still start a draft with the source link filled in.`);
+    } finally {
+      if (!navigatedAway) {
+        setImporting(false);
+      }
+    }
+  }
+
+  function continueWithLinkOnly() {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setImportError("Paste a recipe link first.");
+      return;
+    }
+
+    onImportedDraft({
+      ...createEmptyRecipe(detectSourceType(trimmedUrl)),
+      title: "Imported Recipe",
+      sourceUrl: trimmedUrl,
+      sourceLabel: trimmedUrl,
+    });
+  }
+
+  return (
+    <View style={styles.screenBlock}>
+      <SectionHeading title="Add Recipe" detail="Start from scratch or import a public recipe page" />
+      <View style={styles.heroCard}>
+        <Text style={styles.cardTitle}>Manual entry</Text>
+        <Text style={styles.supportingText}>
+          Create a blank recipe and add the photo, categories, ingredients, and instructions yourself.
+        </Text>
+        <Pressable style={styles.primaryButton} onPress={onManual}>
+          <Text style={styles.primaryButtonLabel}>Add manually</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.heroCard}>
+        <Text style={styles.cardTitle}>Import from link</Text>
+        <Text style={styles.supportingText}>
+          Paste a public recipe website. The app will save the parsed image, ingredients, and instructions to your
+          library when the page exposes recipe data.
+        </Text>
+        <TextInput
+          value={url}
+          onChangeText={(value) => {
+            setUrl(value);
+            setImportError("");
+          }}
+          placeholder="Paste recipe URL"
+          placeholderTextColor="#7c8798"
+          autoCapitalize="none"
+          autoCorrect={false}
+          style={styles.input}
+        />
+        {importError ? <Text style={styles.errorText}>{importError}</Text> : null}
+        <View style={styles.inlineButtonRow}>
+          <Pressable style={styles.secondaryButton} onPress={() => void importFromLink()} disabled={importing}>
+            <Text style={styles.secondaryButtonLabel}>{importing ? "Importing..." : "Import and save"}</Text>
+          </Pressable>
+          <Pressable style={styles.ghostButton} onPress={continueWithLinkOnly}>
+            <Text style={styles.ghostButtonLabel}>Use link only</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <View style={styles.inlineButtonRow}>
+        <Pressable style={styles.ghostButton} onPress={onCancel}>
+          <Text style={styles.ghostButtonLabel}>Cancel</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }

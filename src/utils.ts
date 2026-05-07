@@ -102,6 +102,35 @@ export function buildRecipeFromImport(draft: ImportDraft): Recipe {
   };
 }
 
+export async function buildRecipeFromUrl(url: string): Promise<Recipe> {
+  const trimmedUrl = url.trim();
+  const fallbackRecipe = {
+    ...createEmptyRecipe(detectSourceType(trimmedUrl)),
+    title: guessTitleFromUrl(trimmedUrl),
+    sourceUrl: trimmedUrl,
+    sourceLabel: getSourceLabel(trimmedUrl),
+  };
+
+  const response = await fetch(trimmedUrl);
+  if (!response.ok) {
+    throw new Error(`Could not load the page (${response.status}).`);
+  }
+
+  const html = await response.text();
+  const parsed = parseRecipePage(html);
+
+  return {
+    ...fallbackRecipe,
+    title: parsed.title || fallbackRecipe.title,
+    description: parsed.description || fallbackRecipe.description,
+    imageUri: parsed.imageUri || fallbackRecipe.imageUri,
+    ingredients: parsed.ingredients.length > 0 ? parsed.ingredients : fallbackRecipe.ingredients,
+    instructions: parsed.instructions.length > 0 ? parsed.instructions : fallbackRecipe.instructions,
+    servings: parsed.servings || fallbackRecipe.servings,
+    prepTime: parsed.prepTime || fallbackRecipe.prepTime,
+  };
+}
+
 export function cleanRecipe(recipe: Recipe): Recipe {
   return {
     ...recipe,
@@ -144,6 +173,245 @@ export function cleanRecipe(recipe: Recipe): Recipe {
       ),
     instructions: recipe.instructions.map((step) => step.trim()).filter(Boolean),
   };
+}
+
+function parseRecipePage(html: string) {
+  const recipe = parseJsonLdRecipes(html)[0];
+
+  return {
+    title: getJsonText(recipe?.name) || getMetaContent(html, "og:title") || getTitleTag(html),
+    description:
+      getJsonText(recipe?.description) ||
+      getMetaContent(html, "og:description") ||
+      getMetaContent(html, "description"),
+    imageUri: getJsonImage(recipe?.image) || getMetaContent(html, "og:image"),
+    ingredients: getJsonArray(recipe?.recipeIngredient).map(parseIngredientLine),
+    instructions: parseRecipeInstructions(recipe?.recipeInstructions),
+    servings: getJsonText(recipe?.recipeYield),
+    prepTime: formatDuration(getJsonText(recipe?.prepTime) || getJsonText(recipe?.totalTime)),
+  };
+}
+
+function parseJsonLdRecipes(html: string): Array<Record<string, unknown>> {
+  const scriptBlocks = [
+    ...html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi),
+  ];
+
+  return scriptBlocks.flatMap((block) => {
+    try {
+      return findRecipeObjects(JSON.parse(stripHtmlComments(block[1])));
+    } catch {
+      return [];
+    }
+  });
+}
+
+function findRecipeObjects(value: unknown): Array<Record<string, unknown>> {
+  if (!value || typeof value !== "object") {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap(findRecipeObjects);
+  }
+
+  const object = value as Record<string, unknown>;
+  const type = object["@type"];
+  const types = Array.isArray(type) ? type : [type];
+  const isRecipe = types.some((item) => typeof item === "string" && item.toLowerCase() === "recipe");
+  const graphRecipes = Array.isArray(object["@graph"]) ? object["@graph"].flatMap(findRecipeObjects) : [];
+
+  return isRecipe ? [object, ...graphRecipes] : graphRecipes;
+}
+
+function parseIngredientLine(line: string): Ingredient {
+  const value = decodeHtml(line).trim();
+  const match = value.match(/^(\d+(?:[./]\d+)?|\d+\s+\d+\/\d+)?\s*([a-zA-Z]+)?\s+(.+)$/);
+
+  if (!match) {
+    return { ...createEmptyIngredient(), quantity: "", name: value };
+  }
+
+  const [, quantity = "", possibleUnit = "", rest = value] = match;
+  const unit = normalizeImportedUnit(possibleUnit);
+
+  if (unit) {
+    return { ...createEmptyIngredient(), quantity, unit, name: rest };
+  }
+
+  return {
+    ...createEmptyIngredient(),
+    quantity,
+    name: [possibleUnit, rest].filter(Boolean).join(" "),
+  };
+}
+
+function normalizeImportedUnit(value: string) {
+  const unit = value.toLowerCase();
+  const unitMap: Record<string, string> = {
+    teaspoon: "tsp",
+    teaspoons: "tsp",
+    tablespoon: "tbsp",
+    tablespoons: "tbsp",
+    cups: "cup",
+    ounces: "oz",
+    ounce: "oz",
+    pounds: "lb",
+    pound: "lb",
+    lbs: "lb",
+    grams: "g",
+    gram: "g",
+    kilograms: "kg",
+    kilogram: "kg",
+    liters: "l",
+    liter: "l",
+    cloves: "cloves",
+    cans: "can",
+    jars: "jar",
+    packages: "package",
+    slices: "slice",
+    bunches: "bunch",
+    pinches: "pinch",
+  };
+  const knownUnits = new Set([
+    "tsp",
+    "tbsp",
+    "cup",
+    "oz",
+    "lb",
+    "g",
+    "kg",
+    "ml",
+    "l",
+    "clove",
+    "cloves",
+    "can",
+    "jar",
+    "package",
+    "slice",
+    "bunch",
+    "pinch",
+  ]);
+
+  return unitMap[unit] ?? (knownUnits.has(unit) ? unit : "");
+}
+
+function parseRecipeInstructions(value: unknown): string[] {
+  if (typeof value === "string") {
+    return [decodeHtml(value).trim()].filter(Boolean);
+  }
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .flatMap((step) => {
+      if (typeof step === "string") {
+        return step;
+      }
+
+      if (!step || typeof step !== "object") {
+        return "";
+      }
+
+      const object = step as Record<string, unknown>;
+      if (Array.isArray(object.itemListElement)) {
+        return parseRecipeInstructions(object.itemListElement);
+      }
+
+      return getJsonText(object.text) || getJsonText(object.name);
+    })
+    .map((step) => decodeHtml(step).trim())
+    .filter(Boolean);
+}
+
+function getJsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map(getJsonText).filter(Boolean);
+  }
+
+  const text = getJsonText(value);
+  return text ? [text] : [];
+}
+
+function getJsonText(value: unknown): string {
+  if (typeof value === "string" || typeof value === "number") {
+    return decodeHtml(String(value)).trim();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map(getJsonText).filter(Boolean).join(", ");
+  }
+
+  return "";
+}
+
+function getJsonImage(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return getJsonImage(value[0]);
+  }
+
+  if (value && typeof value === "object") {
+    const image = value as Record<string, unknown>;
+    return getJsonText(image.url) || getJsonText(image.contentUrl);
+  }
+
+  return "";
+}
+
+function getMetaContent(html: string, name: string) {
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const patterns = [
+    new RegExp(`<meta[^>]+(?:property|name)=["']${escapedName}["'][^>]+content=["']([^"']+)["'][^>]*>`, "i"),
+    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escapedName}["'][^>]*>`, "i"),
+  ];
+  const match = patterns.map((pattern) => html.match(pattern)).find(Boolean);
+
+  return match?.[1] ? decodeHtml(match[1]).trim() : "";
+}
+
+function getTitleTag(html: string) {
+  const match = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+  return match?.[1] ? decodeHtml(match[1]).trim() : "";
+}
+
+function formatDuration(value: string) {
+  const match = value.match(/^PT(?:(\d+)H)?(?:(\d+)M)?$/i);
+  if (!match) {
+    return value;
+  }
+
+  const [, hours, minutes] = match;
+  return [hours ? `${hours} hour${hours === "1" ? "" : "s"}` : "", minutes ? `${minutes} min` : ""]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function getSourceLabel(url: string) {
+  try {
+    return new URL(url).hostname.replace("www.", "");
+  } catch {
+    return url;
+  }
+}
+
+function stripHtmlComments(value: string) {
+  return value.replace(/<!--|-->/g, "").trim();
+}
+
+function decodeHtml(value: string) {
+  return value
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ");
 }
 
 export function mergeGroceryItems(recipes: Recipe[]) {
